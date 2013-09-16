@@ -10,7 +10,7 @@ import (
 )
 
 func TestWriterOpen(t *testing.T) {
-	tmpdir, err := ioutil.TempDir("", "httpstream-test")
+	tmpdir, err := ioutil.TempDir("", "rwvfs-test-")
 	if err != nil {
 		t.Fatal("TempDir", err)
 	}
