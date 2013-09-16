@@ -8,9 +8,16 @@ import (
 
 type FileSystem interface {
 	vfs.FileSystem
-	WriterOpener
+	Opener
 }
 
-type WriterOpener interface {
-	WriterOpen(path string) (io.WriteCloser, error)
+type Opener interface {
+	OpenFile(path string, flag int) (ReadWriteSeekCloser, error)
+}
+
+type ReadWriteSeekCloser interface {
+	io.Reader
+	io.Writer
+	io.Seeker
+	io.Closer
 }

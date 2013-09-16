@@ -3,7 +3,6 @@ package rwvfs
 import (
 	"code.google.com/p/go.tools/godoc/vfs"
 	"fmt"
-	"io"
 	"os"
 	pathpkg "path"
 	"path/filepath"
@@ -33,8 +32,8 @@ func (fs osFS) resolve(path string) string {
 
 // WriterOpen opens the file at path for writing, creating the file if it
 // doesn't exist and truncating it otherwise.
-func (fs osFS) WriterOpen(path string) (io.WriteCloser, error) {
-	f, err := os.OpenFile(fs.resolve(path), os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
+func (fs osFS) OpenFile(path string, flag int) (ReadWriteSeekCloser, error) {
+	f, err := os.OpenFile(fs.resolve(path), flag, 0644)
 	if err != nil {
 		return nil, err
 	}

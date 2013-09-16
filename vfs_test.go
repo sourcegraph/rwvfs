@@ -23,14 +23,14 @@ func TestWriterOpen(t *testing.T) {
 		{OS(tmpdir), "/foo"},
 	}
 	for _, test := range tests {
-		testWriterOpen(t, test.fs, test.path)
+		testWrite(t, test.fs, test.path)
 	}
 }
 
-func testWriterOpen(t *testing.T, fs FileSystem, path string) {
+func testWrite(t *testing.T, fs FileSystem, path string) {
 	label := fmt.Sprintf("%T", fs)
 
-	w, err := fs.WriterOpen(path)
+	w, err := fs.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC|os.O_EXCL)
 	if err != nil {
 		t.Fatalf("%s: WriterOpen: %s", label, err)
 	}
