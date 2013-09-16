@@ -30,8 +30,8 @@ func (fs osFS) resolve(path string) string {
 	return filepath.Join(string(fs.root), path)
 }
 
-// WriterOpen opens the file at path for writing, creating the file if it
-// doesn't exist and truncating it otherwise.
+// OpenFile opens the file at path for writing, creating the file if it doesn't
+// exist and truncating it otherwise.
 func (fs osFS) OpenFile(path string, flag int) (ReadWriteSeekCloser, error) {
 	f, err := os.OpenFile(fs.resolve(path), flag, 0644)
 	if err != nil {
