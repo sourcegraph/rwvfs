@@ -2,6 +2,7 @@ package rwvfs
 
 import (
 	"bytes"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"os"
@@ -28,35 +29,37 @@ func TestWriterOpen(t *testing.T) {
 }
 
 func testWriterOpen(t *testing.T, fs FileSystem, path string) {
+	label := fmt.Sprintf("%T", fs)
+
 	w, err := fs.WriterOpen(path)
 	if err != nil {
-		t.Fatal("WriterOpen", err)
+		t.Fatalf("%s: WriterOpen: %s", label, err)
 	}
 
 	input := []byte("qux")
 	_, err = w.Write(input)
 	if err != nil {
-		t.Fatal("Write", err)
+		t.Fatalf("%s: Write: %s", label, err)
 	}
 
 	err = w.Close()
 	if err != nil {
-		t.Fatal("Close", err)
+		t.Fatalf("%s: Close: %s", label, err)
 	}
 
 	var r io.ReadCloser
 	r, err = fs.Open(path)
 	if err != nil {
-		t.Fatal("Open", err)
+		t.Fatalf("%s: Open: %s", label, err)
 	}
 
 	var output []byte
 	output, err = ioutil.ReadAll(r)
 	if err != nil {
-		t.Fatal("ReadAll", err)
+		t.Fatalf("%s: ReadAll: %s", label, err)
 	}
 
 	if !bytes.Equal(output, input) {
-		t.Errorf("got output %q, want %q", output, input)
+		t.Errorf("%s: got output %q, want %q", label, output, input)
 	}
 }
