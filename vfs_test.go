@@ -20,6 +20,7 @@ func TestWriterOpen(t *testing.T) {
 		path string
 	}{
 		{OS(tmpdir), "/foo"},
+		{Map(make(map[string]string)), "/foo"},
 	}
 	for _, test := range tests {
 		testWriterOpen(t, test.fs, test.path)
