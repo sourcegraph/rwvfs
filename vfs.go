@@ -15,12 +15,5 @@ type FileSystem interface {
 // A Creator implements the Create function for writing to a file.
 type Creator interface {
 	// Create creates the named file, truncating it if it already exists.
-	Create(path string) (ReadWriteSeekCloser, error)
-}
-
-type ReadWriteSeekCloser interface {
-	io.Reader
-	io.Writer
-	io.Seeker
-	io.Closer
+	Create(path string) (io.WriteCloser, error)
 }

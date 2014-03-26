@@ -2,6 +2,7 @@ package rwvfs
 
 import (
 	"fmt"
+	"io"
 	"os"
 	pathpkg "path"
 	"path/filepath"
@@ -33,7 +34,7 @@ func (fs osFS) resolve(path string) string {
 
 // Create opens the file at path for writing, creating the file if it doesn't
 // exist and truncating it otherwise.
-func (fs osFS) Create(path string) (ReadWriteSeekCloser, error) {
+func (fs osFS) Create(path string) (io.WriteCloser, error) {
 	f, err := os.Create(fs.resolve(path))
 	if err != nil {
 		return nil, err
