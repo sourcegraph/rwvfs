@@ -21,6 +21,7 @@ func TestWriterCreate(t *testing.T) {
 		path string
 	}{
 		{OS(tmpdir), "/foo"},
+		{Map(map[string]string{}), "/foo"},
 	}
 	for _, test := range tests {
 		testWrite(t, test.fs, test.path)
