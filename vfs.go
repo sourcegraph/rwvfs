@@ -2,8 +2,9 @@
 package rwvfs
 
 import (
-	"code.google.com/p/go.tools/godoc/vfs"
 	"io"
+
+	"code.google.com/p/go.tools/godoc/vfs"
 )
 
 type FileSystem interface {

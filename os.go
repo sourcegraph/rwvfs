@@ -1,11 +1,12 @@
 package rwvfs
 
 import (
-	"code.google.com/p/go.tools/godoc/vfs"
 	"fmt"
 	"os"
 	pathpkg "path"
 	"path/filepath"
+
+	"code.google.com/p/go.tools/godoc/vfs"
 )
 
 // OS returns an implementation of FileSystem reading from the tree rooted at
