@@ -9,7 +9,7 @@ import (
 	"testing"
 )
 
-func TestWriterCreate(t *testing.T) {
+func TestRWVFS(t *testing.T) {
 	tmpdir, err := ioutil.TempDir("", "rwvfs-test-")
 	if err != nil {
 		t.Fatal("TempDir", err)
@@ -25,6 +25,8 @@ func TestWriterCreate(t *testing.T) {
 	}
 	for _, test := range tests {
 		testWrite(t, test.fs, test.path)
+		testMkdir(t, test.fs)
+		testMkdirAll(t, test.fs)
 	}
 }
 
@@ -71,5 +73,61 @@ func testWrite(t *testing.T, fs FileSystem, path string) {
 	}
 	if !bytes.Equal(output, input) {
 		t.Errorf("%s: got output %q, want %q", label, output, input)
+	}
+}
+
+func testMkdir(t *testing.T, fs FileSystem) {
+	label := fmt.Sprintf("%T", fs)
+
+	err := fs.Mkdir("dir0")
+	if err != nil {
+		t.Fatalf("%s: Mkdir(dir0): %s", label, err)
+	}
+	testIsDir(t, label, fs, "dir0")
+	testIsDir(t, label, fs, "/dir0")
+
+	err = fs.Mkdir("/dir1")
+	if err != nil {
+		t.Fatalf("%s: Mkdir(/dir1): %s", label, err)
+	}
+	testIsDir(t, label, fs, "dir1")
+	testIsDir(t, label, fs, "/dir1")
+
+	err = fs.Mkdir("/dir1")
+	if !os.IsExist(err) {
+		t.Errorf("%s: Mkdir(/dir1) again: got no error, want os.IsExist-satisfying error", label)
+	}
+
+	err = fs.Mkdir("/parent-doesnt-exist/dir2")
+	if !os.IsNotExist(err) {
+		t.Errorf("%s: Mkdir(/parent-doesnt-exist/dir2): got error %v, want os.IsNotExist-satisfying error", label, err)
+	}
+}
+
+func testMkdirAll(t *testing.T, fs FileSystem) {
+	label := fmt.Sprintf("%T", fs)
+
+	err := MkdirAll(fs, "/a/b/c")
+	if err != nil {
+		t.Fatalf("%s: MkdirAll: %s", label, err)
+	}
+	testIsDir(t, label, fs, "/a")
+	testIsDir(t, label, fs, "/a/b")
+	testIsDir(t, label, fs, "/a/b/c")
+
+	err = MkdirAll(fs, "/a/b/c")
+	if err != nil {
+		t.Fatalf("%s: MkdirAll again: %s", label, err)
+	}
+}
+
+func testIsDir(t *testing.T, label string, fs FileSystem, path string) {
+	fi, err := fs.Stat(path)
+	if err != nil {
+		t.Fatalf("%s: Stat(%q): %s", label, path, err)
+	}
+
+	if !fi.IsDir() {
+		t.Errorf("%s: got fs.Stat(%q) IsDir() == false, want true", label, path)
 	}
 }

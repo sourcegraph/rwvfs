@@ -2,7 +2,10 @@ package rwvfs
 
 import (
 	"io"
+	"os"
+	pathpkg "path"
 	"strings"
+	"time"
 
 	"code.google.com/p/go.tools/godoc/vfs"
 	"code.google.com/p/go.tools/godoc/vfs/mapfs"
@@ -11,11 +14,12 @@ import (
 // Map returns a new FileSystem from the provided map. Map keys should be
 // forward slash-separated pathnames and not contain a leading slash.
 func Map(m map[string]string) FileSystem {
-	return mapFS{m, mapfs.New(m)}
+	return mapFS{m, map[string]struct{}{"": struct{}{}}, mapfs.New(m)}
 }
 
 type mapFS struct {
-	m map[string]string
+	m    map[string]string
+	dirs map[string]struct{}
 	vfs.FileSystem
 }
 
@@ -31,6 +35,19 @@ func filename(p string) string {
 	return strings.TrimPrefix(p, "/")
 }
 
+// slashdir returns path.Dir(p), but special-cases paths not beginning
+// with a slash to be in the root.
+func slashdir(p string) string {
+	d := pathpkg.Dir(p)
+	if d == "." {
+		return "/"
+	}
+	if strings.HasPrefix(p, "/") {
+		return d
+	}
+	return "/" + d
+}
+
 type mapFile struct {
 	m    map[string]string
 	path string
@@ -42,3 +59,67 @@ func (f *mapFile) Write(p []byte) (int, error) {
 }
 
 func (f mapFile) Close() error { return nil }
+
+func (mfs mapFS) Lstat(p string) (os.FileInfo, error) {
+	// proxy mapfs.mapFS.Lstat to not return errors for empty directories
+	// created with Mkdir
+	p = filename(p)
+	fi, err := mfs.FileSystem.Lstat(p)
+	if os.IsNotExist(err) {
+		_, ok := mfs.dirs[p]
+		if ok {
+			return mapFI{name: pathpkg.Base(p), dir: true}, nil
+		}
+	}
+	return fi, err
+}
+
+func (mfs mapFS) Stat(p string) (os.FileInfo, error) {
+	return mfs.Lstat(p)
+}
+
+func (mfs mapFS) ReadDir(p string) ([]os.FileInfo, error) {
+	// proxy mapfs.mapFS.ReadDir to not return errors for empty directories
+	// created with Mkdir
+	fis, err := mfs.FileSystem.ReadDir(p)
+	if os.IsNotExist(err) {
+		_, ok := mfs.dirs[filename(p)]
+		if ok {
+			return nil, nil
+		}
+	}
+	return fis, err
+}
+
+func (mfs mapFS) Mkdir(name string) error {
+	name = filename(name)
+	_, err := mfs.Stat(slashdir(name))
+	if os.IsNotExist(err) {
+		return err
+	}
+	fi, _ := mfs.Stat(name)
+	if fi != nil {
+		return os.ErrExist
+	}
+	mfs.dirs[name] = struct{}{}
+	return nil
+}
+
+// mapFI is the map-based implementation of FileInfo.
+type mapFI struct {
+	name string
+	size int
+	dir  bool
+}
+
+func (fi mapFI) IsDir() bool        { return fi.dir }
+func (fi mapFI) ModTime() time.Time { return time.Time{} }
+func (fi mapFI) Mode() os.FileMode {
+	if fi.IsDir() {
+		return 0755 | os.ModeDir
+	}
+	return 0444
+}
+func (fi mapFI) Name() string     { return pathpkg.Base(fi.name) }
+func (fi mapFI) Size() int64      { return int64(fi.size) }
+func (fi mapFI) Sys() interface{} { return nil }

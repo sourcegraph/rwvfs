@@ -50,3 +50,8 @@ func (fs osFS) Create(path string) (io.WriteCloser, error) {
 
 	return f, nil
 }
+
+func (fs osFS) Mkdir(name string) error {
+	err := os.Mkdir(fs.resolve(name), 0700)
+	return err
+}
