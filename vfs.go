@@ -9,11 +9,13 @@ import (
 
 type FileSystem interface {
 	vfs.FileSystem
-	Opener
+	Creator
 }
 
-type Opener interface {
-	OpenFile(path string, flag int) (ReadWriteSeekCloser, error)
+// A Creator implements the Create function for writing to a file.
+type Creator interface {
+	// Create creates the named file, truncating it if it already exists.
+	Create(path string) (ReadWriteSeekCloser, error)
 }
 
 type ReadWriteSeekCloser interface {

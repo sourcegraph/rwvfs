@@ -9,7 +9,7 @@ import (
 	"testing"
 )
 
-func TestWriterOpen(t *testing.T) {
+func TestWriterCreate(t *testing.T) {
 	tmpdir, err := ioutil.TempDir("", "rwvfs-test-")
 	if err != nil {
 		t.Fatal("TempDir", err)
@@ -30,7 +30,7 @@ func TestWriterOpen(t *testing.T) {
 func testWrite(t *testing.T, fs FileSystem, path string) {
 	label := fmt.Sprintf("%T", fs)
 
-	w, err := fs.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC|os.O_EXCL)
+	w, err := fs.Create(path)
 	if err != nil {
 		t.Fatalf("%s: WriterOpen: %s", label, err)
 	}
