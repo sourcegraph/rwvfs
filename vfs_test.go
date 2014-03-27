@@ -9,6 +9,43 @@ import (
 	"testing"
 )
 
+func TestSub(t *testing.T) {
+	m := Map(map[string]string{})
+	sub := Sub(m, "/sub")
+
+	err := sub.Mkdir("/")
+	if err != nil {
+		t.Fatal(err)
+	}
+	testIsDir(t, "sub", m, "/sub")
+
+	f, err := sub.Create("f1")
+	f.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+	testIsFile(t, "sub", m, "/sub/f1")
+
+	f, err = sub.Create("/f2")
+	f.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+	testIsFile(t, "sub", m, "/sub/f2")
+
+	err = sub.Mkdir("/d1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	testIsDir(t, "sub", m, "/sub/d1")
+
+	err = sub.Mkdir("/d2")
+	if err != nil {
+		t.Fatal(err)
+	}
+	testIsDir(t, "sub", m, "/sub/d2")
+}
+
 func TestRWVFS(t *testing.T) {
 	tmpdir, err := ioutil.TempDir("", "rwvfs-test-")
 	if err != nil {
@@ -22,6 +59,7 @@ func TestRWVFS(t *testing.T) {
 	}{
 		{OS(tmpdir), "/foo"},
 		{Map(map[string]string{}), "/foo"},
+		{Sub(Map(map[string]string{}), "/x"), "/foo"},
 	}
 	for _, test := range tests {
 		testWrite(t, test.fs, test.path)
@@ -79,6 +117,10 @@ func testWrite(t *testing.T, fs FileSystem, path string) {
 func testMkdir(t *testing.T, fs FileSystem) {
 	label := fmt.Sprintf("%T", fs)
 
+	if _, ok := fs.(*subFS); ok {
+		fs.Mkdir("/")
+	}
+
 	err := fs.Mkdir("dir0")
 	if err != nil {
 		t.Fatalf("%s: Mkdir(dir0): %s", label, err)
@@ -129,5 +171,16 @@ func testIsDir(t *testing.T, label string, fs FileSystem, path string) {
 
 	if !fi.IsDir() {
 		t.Errorf("%s: got fs.Stat(%q) IsDir() == false, want true", label, path)
+	}
+}
+
+func testIsFile(t *testing.T, label string, fs FileSystem, path string) {
+	fi, err := fs.Stat(path)
+	if err != nil {
+		t.Fatalf("%s: Stat(%q): %s", label, path, err)
+	}
+
+	if !fi.Mode().IsRegular() {
+		t.Errorf("%s: got fs.Stat(%q) Mode().IsRegular() == false, want true", label, path)
 	}
 }
