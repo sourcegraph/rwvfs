@@ -95,6 +95,8 @@ func testGlob(t *testing.T, fs FileSystem) {
 		matches []string
 	}{
 		{"", "x/y/*.txt", []string{"x/y/0.txt", "x/y/1.txt"}},
+		{"x/y", "x/y/*.txt", []string{"x/y/0.txt", "x/y/1.txt"}},
+		{"", "x/*", []string{"x/y", "x/2.txt"}},
 	}
 	for _, test := range globTests {
 		matches, err := Glob(WalkableFileSystem{fs}, test.prefix, test.pattern)
