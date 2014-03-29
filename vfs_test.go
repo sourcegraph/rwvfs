@@ -6,6 +6,9 @@ import (
 	"io"
 	"io/ioutil"
 	"os"
+	"path/filepath"
+	"reflect"
+	"sort"
 	"testing"
 )
 
@@ -65,6 +68,45 @@ func TestRWVFS(t *testing.T) {
 		testWrite(t, test.fs, test.path)
 		testMkdir(t, test.fs)
 		testMkdirAll(t, test.fs)
+		testGlob(t, test.fs)
+	}
+}
+
+func testGlob(t *testing.T, fs FileSystem) {
+	label := fmt.Sprintf("%T", fs)
+
+	files := []string{"x/y/0.txt", "x/y/1.txt", "x/2.txt"}
+	for _, file := range files {
+		err := MkdirAll(fs, filepath.Dir(file))
+		if err != nil {
+			t.Fatalf("%s: MkdirAll: %s", label, err)
+		}
+		w, err := fs.Create(file)
+		if err != nil {
+			t.Errorf("%s: Create(%q): %s", label, file, err)
+			return
+		}
+		w.Close()
+	}
+
+	globTests := []struct {
+		prefix  string
+		pattern string
+		matches []string
+	}{
+		{"", "x/y/*.txt", []string{"x/y/0.txt", "x/y/1.txt"}},
+	}
+	for _, test := range globTests {
+		matches, err := Glob(WalkableFileSystem{fs}, test.prefix, test.pattern)
+		if err != nil {
+			t.Errorf("%s: Glob(prefix=%q, pattern=%q): %s", label, test.prefix, test.pattern, err)
+			continue
+		}
+		sort.Strings(test.matches)
+		sort.Strings(matches)
+		if !reflect.DeepEqual(matches, test.matches) {
+			t.Errorf("%s: Glob(prefix=%q, pattern=%q): got %v, want %v", label, test.prefix, test.pattern, matches, test.matches)
+		}
 	}
 }
 

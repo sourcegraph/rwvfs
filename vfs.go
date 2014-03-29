@@ -4,7 +4,10 @@ package rwvfs
 import (
 	"io"
 	"os"
+	"path/filepath"
 	"syscall"
+
+	"github.com/kr/fs"
 
 	"code.google.com/p/go.tools/godoc/vfs"
 )
@@ -63,3 +66,25 @@ func MkdirAll(fs FileSystem, path string) error {
 	}
 	return nil
 }
+
+// Glob returns the names of all files under prefix matching pattern or nil if
+// there is no matching file. The syntax of patterns is the same as in
+// path/filepath.Match.
+func Glob(wfs WalkableFileSystem, prefix, pattern string) (matches []string, err error) {
+	walker := fs.WalkFS(filepath.Clean(prefix), wfs)
+	for walker.Step() {
+		path := walker.Path()
+		matched, err := filepath.Match(pattern, path)
+		if err != nil {
+			return nil, err
+		}
+		if matched {
+			matches = append(matches, path)
+		}
+	}
+	return
+}
+
+type WalkableFileSystem struct{ FileSystem }
+
+func (_ WalkableFileSystem) Join(elem ...string) string { return filepath.Join(elem...) }

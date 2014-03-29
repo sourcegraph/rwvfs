@@ -4,6 +4,7 @@ import (
 	"io"
 	"os"
 	pathpkg "path"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -32,6 +33,9 @@ func (mfs mapFS) Create(path string) (io.WriteCloser, error) {
 }
 
 func filename(p string) string {
+	if p == "." {
+		return "/"
+	}
 	return strings.TrimPrefix(p, "/")
 }
 
@@ -78,14 +82,36 @@ func (mfs mapFS) Stat(p string) (os.FileInfo, error) {
 	return mfs.Lstat(p)
 }
 
+func dirInfo(name string) os.FileInfo {
+	return mapFI{name: pathpkg.Base(name), dir: true}
+}
+
+func fileInfo(name, contents string) os.FileInfo {
+	return mapFI{name: pathpkg.Base(name), size: len(contents)}
+}
+
 func (mfs mapFS) ReadDir(p string) ([]os.FileInfo, error) {
 	// proxy mapfs.mapFS.ReadDir to not return errors for empty directories
 	// created with Mkdir
+	p = filename(p)
 	fis, err := mfs.FileSystem.ReadDir(p)
 	if os.IsNotExist(err) {
-		_, ok := mfs.dirs[filename(p)]
+		_, ok := mfs.dirs[p]
 		if ok {
-			return nil, nil
+			// return a list of subdirs and files (the underlying ReadDir impl
+			// fails here because it thinks the directories don't exist).
+			fis = nil
+			for dir, _ := range mfs.dirs {
+				if filepath.Dir(dir) == p {
+					fis = append(fis, dirInfo(dir))
+				}
+			}
+			for fn, b := range mfs.m {
+				if slashdir(fn) == "/"+p {
+					fis = append(fis, fileInfo(fn, b))
+				}
+			}
+			return fis, nil
 		}
 	}
 	return fis, err
