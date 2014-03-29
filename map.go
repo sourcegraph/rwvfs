@@ -105,6 +105,13 @@ func (mfs mapFS) Mkdir(name string) error {
 	return nil
 }
 
+func (mfs mapFS) Remove(name string) error {
+	name = filename(name)
+	delete(mfs.dirs, name)
+	delete(mfs.m, name)
+	return nil
+}
+
 // mapFI is the map-based implementation of FileInfo.
 type mapFI struct {
 	name string

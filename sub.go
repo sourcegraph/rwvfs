@@ -38,3 +38,5 @@ func (s *subFS) Open(name string) (vfs.ReadSeekCloser, error) { return s.fs.Open
 func (s *subFS) Create(path string) (io.WriteCloser, error) { return s.fs.Create(s.resolve(path)) }
 
 func (s *subFS) Mkdir(name string) error { return s.fs.Mkdir(s.resolve(name)) }
+
+func (s *subFS) Remove(name string) error { return s.fs.Remove(s.resolve(name)) }

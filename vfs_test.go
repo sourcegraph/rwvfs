@@ -112,6 +112,12 @@ func testWrite(t *testing.T, fs FileSystem, path string) {
 	if !bytes.Equal(output, input) {
 		t.Errorf("%s: got output %q, want %q", label, output, input)
 	}
+
+	err = fs.Remove(path)
+	if err != nil {
+		t.Errorf("%s: Remove(%q): %s", label, path, err)
+	}
+	testPathDoesNotExist(t, label, fs, path)
 }
 
 func testMkdir(t *testing.T, fs FileSystem) {
@@ -144,6 +150,12 @@ func testMkdir(t *testing.T, fs FileSystem) {
 	if !os.IsNotExist(err) {
 		t.Errorf("%s: Mkdir(/parent-doesnt-exist/dir2): got error %v, want os.IsNotExist-satisfying error", label, err)
 	}
+
+	err = fs.Remove("/dir1")
+	if err != nil {
+		t.Errorf("%s: Remove(/dir1): %s", label, err)
+	}
+	testPathDoesNotExist(t, label, fs, "/dir1")
 }
 
 func testMkdirAll(t *testing.T, fs FileSystem) {
@@ -182,5 +194,14 @@ func testIsFile(t *testing.T, label string, fs FileSystem, path string) {
 
 	if !fi.Mode().IsRegular() {
 		t.Errorf("%s: got fs.Stat(%q) Mode().IsRegular() == false, want true", label, path)
+	}
+}
+
+func testPathDoesNotExist(t *testing.T, label string, fs FileSystem, path string) {
+	fi, err := fs.Stat(path)
+	if err != nil && !os.IsNotExist(err) {
+		t.Errorf("%s: Stat(%q): want os.IsNotExist-satisfying error, got %q", label, path, err)
+	} else if err == nil {
+		t.Errorf("%s: Stat(%q): want file to not exist, got existing file with FileInfo %+v", label, path, fi)
 	}
 }

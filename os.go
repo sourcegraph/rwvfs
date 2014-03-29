@@ -55,3 +55,7 @@ func (fs osFS) Mkdir(name string) error {
 	err := os.Mkdir(fs.resolve(name), 0700)
 	return err
 }
+
+func (fs osFS) Remove(name string) error {
+	return os.Remove(fs.resolve(name))
+}

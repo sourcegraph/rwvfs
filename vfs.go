@@ -18,6 +18,9 @@ type FileSystem interface {
 	// Mkdir creates a new directory. If name is already a directory, Mkdir
 	// returns an error (that can be detected using os.IsExist).
 	Mkdir(name string) error
+
+	// Remove removes the named file or directory.
+	Remove(name string) error
 }
 
 // MkdirAll creates a directory named path, along with any necessary parents. If
