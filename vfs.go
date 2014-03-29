@@ -85,6 +85,11 @@ func Glob(wfs WalkableFileSystem, prefix, pattern string) (matches []string, err
 	return
 }
 
-type WalkableFileSystem struct{ FileSystem }
+type WalkableFileSystem interface {
+	FileSystem
+	Join(elem ...string) string
+}
 
-func (_ WalkableFileSystem) Join(elem ...string) string { return filepath.Join(elem...) }
+type walkableFileSystem struct{ FileSystem }
+
+func (_ walkableFileSystem) Join(elem ...string) string { return filepath.Join(elem...) }
