@@ -126,6 +126,11 @@ func testWrite(t *testing.T, fs FileSystem, path string) {
 		t.Fatalf("%s: Write: %s", label, err)
 	}
 
+	err = w.Close()
+	if err != nil {
+		t.Fatalf("%s: w.Close: %s", label, err)
+	}
+
 	var r io.ReadCloser
 	r, err = fs.Open(path)
 	if err != nil {
@@ -138,11 +143,6 @@ func testWrite(t *testing.T, fs FileSystem, path string) {
 	}
 	if !bytes.Equal(output, input) {
 		t.Errorf("%s: got output %q, want %q", label, output, input)
-	}
-
-	err = w.Close()
-	if err != nil {
-		t.Fatalf("%s: Close: %s", label, err)
 	}
 
 	r, err = fs.Open(path)
@@ -223,6 +223,10 @@ func testIsDir(t *testing.T, label string, fs FileSystem, path string) {
 	fi, err := fs.Stat(path)
 	if err != nil {
 		t.Fatalf("%s: Stat(%q): %s", label, path, err)
+	}
+
+	if fi == nil {
+		t.Fatalf("%s: FileInfo (%q) == nil", label, path)
 	}
 
 	if !fi.IsDir() {
