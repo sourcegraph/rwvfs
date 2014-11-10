@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"code.google.com/p/go.tools/godoc/vfs"
+	"golang.org/x/tools/godoc/vfs"
 )
 
 // Sub returns an implementation of FileSystem mounted at prefix on the

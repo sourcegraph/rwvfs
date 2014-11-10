@@ -8,8 +8,8 @@ import (
 	"strings"
 	"time"
 
-	"code.google.com/p/go.tools/godoc/vfs"
-	"code.google.com/p/go.tools/godoc/vfs/mapfs"
+	"golang.org/x/tools/godoc/vfs"
+	"golang.org/x/tools/godoc/vfs/mapfs"
 )
 
 // Map returns a new FileSystem from the provided map. Map keys should be

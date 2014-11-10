@@ -9,7 +9,7 @@ import (
 
 	"github.com/kr/fs"
 
-	"code.google.com/p/go.tools/godoc/vfs"
+	"golang.org/x/tools/godoc/vfs"
 )
 
 type FileSystem interface {

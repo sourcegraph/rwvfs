@@ -7,7 +7,7 @@ import (
 	pathpkg "path"
 	"path/filepath"
 
-	"code.google.com/p/go.tools/godoc/vfs"
+	"golang.org/x/tools/godoc/vfs"
 )
 
 // OS returns an implementation of FileSystem reading from the tree rooted at
@@ -21,7 +21,7 @@ type osFS struct {
 	vfs.FileSystem
 }
 
-// resolve is from code.google.com/p/go.tools/godoc/vfs.
+// resolve is from golang.org/x/tools/godoc/vfs.
 func (fs osFS) resolve(path string) string {
 	// Clean the path so that it cannot possibly begin with ../.
 	// If it did, the result of filepath.Join would be outside the
