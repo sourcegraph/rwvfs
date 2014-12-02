@@ -93,3 +93,5 @@ type WalkableFileSystem interface {
 type walkableFileSystem struct{ FileSystem }
 
 func (_ walkableFileSystem) Join(elem ...string) string { return filepath.Join(elem...) }
+
+func (fs walkableFileSystem) Underlying() FileSystem { return fs.FileSystem }
