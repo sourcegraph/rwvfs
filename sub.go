@@ -37,6 +37,21 @@ func (s *subFS) Open(name string) (vfs.ReadSeekCloser, error) { return s.fs.Open
 
 func (s *subFS) Create(path string) (io.WriteCloser, error) { return s.fs.Create(s.resolve(path)) }
 
-func (s *subFS) Mkdir(name string) error { return s.fs.Mkdir(s.resolve(name)) }
+func (s *subFS) Mkdir(name string) error {
+	err := s.mkdir(name)
+	if os.IsNotExist(err) {
+		// Automatically create subFS's prefix dirs they don't exist.
+		if osErr, ok := err.(*os.PathError); ok && slash(osErr.Path) == slash(s.prefix) {
+
+			if err := MkdirAll(s.fs, s.prefix); err != nil {
+				return err
+			}
+			return s.mkdir(name)
+		}
+	}
+	return err
+}
+
+func (s *subFS) mkdir(name string) error { return s.fs.Mkdir(s.resolve(name)) }
 
 func (s *subFS) Remove(name string) error { return s.fs.Remove(s.resolve(name)) }

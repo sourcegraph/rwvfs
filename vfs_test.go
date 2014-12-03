@@ -253,3 +253,15 @@ func testPathDoesNotExist(t *testing.T, label string, fs FileSystem, path string
 		t.Errorf("%s: Stat(%q): want file to not exist, got existing file with FileInfo %+v", label, path, fi)
 	}
 }
+
+func TestMap_MkdirAllWithRootNotExists(t *testing.T) {
+	m := map[string]string{}
+	fs := Sub(Map(m), "x")
+
+	paths := []string{"a/b", "/c/d"}
+	for _, path := range paths {
+		if err := MkdirAll(fs, path); err != nil {
+			t.Errorf("MkdirAll %q: %s", path, err)
+		}
+	}
+}

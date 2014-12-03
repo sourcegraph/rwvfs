@@ -52,6 +52,13 @@ func slashdir(p string) string {
 	return "/" + d
 }
 
+func slash(p string) string {
+	if p == "." {
+		return "/"
+	}
+	return "/" + strings.TrimPrefix(p, "/")
+}
+
 type mapFile struct {
 	m    map[string]string
 	path string
@@ -64,7 +71,7 @@ func (f *mapFile) Write(p []byte) (int, error) {
 
 func (f mapFile) Close() error { return nil }
 
-func (mfs mapFS) Lstat(p string) (os.FileInfo, error) {
+func (mfs mapFS) lstat(p string) (os.FileInfo, error) {
 	// proxy mapfs.mapFS.Lstat to not return errors for empty directories
 	// created with Mkdir
 	p = filename(p)
@@ -78,8 +85,20 @@ func (mfs mapFS) Lstat(p string) (os.FileInfo, error) {
 	return fi, err
 }
 
+func (mfs mapFS) Lstat(p string) (os.FileInfo, error) {
+	fi, err := mfs.lstat(p)
+	if err != nil {
+		err = &os.PathError{Op: "lstat", Path: p, Err: err}
+	}
+	return fi, err
+}
+
 func (mfs mapFS) Stat(p string) (os.FileInfo, error) {
-	return mfs.Lstat(p)
+	fi, err := mfs.lstat(p)
+	if err != nil {
+		err = &os.PathError{Op: "stat", Path: p, Err: err}
+	}
+	return fi, err
 }
 
 func dirInfo(name string) os.FileInfo {
@@ -119,8 +138,7 @@ func (mfs mapFS) ReadDir(p string) ([]os.FileInfo, error) {
 
 func (mfs mapFS) Mkdir(name string) error {
 	name = filename(name)
-	_, err := mfs.Stat(slashdir(name))
-	if os.IsNotExist(err) {
+	if _, err := mfs.Stat(slashdir(name)); err != nil {
 		return err
 	}
 	fi, _ := mfs.Stat(name)
