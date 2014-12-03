@@ -6,7 +6,6 @@ import (
 	pathpkg "path"
 	"path/filepath"
 	"strings"
-	"time"
 
 	"golang.org/x/tools/godoc/vfs"
 	"golang.org/x/tools/godoc/vfs/mapfs"
@@ -15,7 +14,20 @@ import (
 // Map returns a new FileSystem from the provided map. Map keys should be
 // forward slash-separated pathnames and not contain a leading slash.
 func Map(m map[string]string) FileSystem {
-	return mapFS{m, map[string]struct{}{"": struct{}{}}, mapfs.New(m)}
+	fs := mapFS{
+		m:          m,
+		dirs:       map[string]struct{}{"": struct{}{}},
+		FileSystem: mapfs.New(m),
+	}
+
+	// Create initial dirs.
+	for path := range m {
+		if err := MkdirAll(fs, filepath.Dir(path)); err != nil {
+			panic(err.Error())
+		}
+	}
+
+	return fs
 }
 
 type mapFS struct {
@@ -79,7 +91,7 @@ func (mfs mapFS) lstat(p string) (os.FileInfo, error) {
 	if os.IsNotExist(err) {
 		_, ok := mfs.dirs[p]
 		if ok {
-			return mapFI{name: pathpkg.Base(p), dir: true}, nil
+			return &fileInfo{name: pathpkg.Base(p), dir: true}, nil
 		}
 	}
 	return fi, err
@@ -101,14 +113,6 @@ func (mfs mapFS) Stat(p string) (os.FileInfo, error) {
 	return fi, err
 }
 
-func dirInfo(name string) os.FileInfo {
-	return mapFI{name: pathpkg.Base(name), dir: true}
-}
-
-func fileInfo(name, contents string) os.FileInfo {
-	return mapFI{name: pathpkg.Base(name), size: len(contents)}
-}
-
 func (mfs mapFS) ReadDir(p string) ([]os.FileInfo, error) {
 	// proxy mapfs.mapFS.ReadDir to not return errors for empty directories
 	// created with Mkdir
@@ -121,19 +125,27 @@ func (mfs mapFS) ReadDir(p string) ([]os.FileInfo, error) {
 			// fails here because it thinks the directories don't exist).
 			fis = nil
 			for dir, _ := range mfs.dirs {
-				if filepath.Dir(dir) == p {
-					fis = append(fis, dirInfo(dir))
+				if filepath.Dir(dir) == p || (p == "" && filepath.Dir(dir) == "." && dir != "." && dir != "") {
+					fis = append(fis, newDirInfo(dir))
 				}
 			}
 			for fn, b := range mfs.m {
 				if slashdir(fn) == "/"+p {
-					fis = append(fis, fileInfo(fn, b))
+					fis = append(fis, newFileInfo(fn, b))
 				}
 			}
 			return fis, nil
 		}
 	}
 	return fis, err
+}
+
+func fileInfoNames(fis []os.FileInfo) []string {
+	names := make([]string, len(fis))
+	for i, fi := range fis {
+		names[i] = fi.Name()
+	}
+	return names
 }
 
 func (mfs mapFS) Mkdir(name string) error {
@@ -155,22 +167,3 @@ func (mfs mapFS) Remove(name string) error {
 	delete(mfs.m, name)
 	return nil
 }
-
-// mapFI is the map-based implementation of FileInfo.
-type mapFI struct {
-	name string
-	size int
-	dir  bool
-}
-
-func (fi mapFI) IsDir() bool        { return fi.dir }
-func (fi mapFI) ModTime() time.Time { return time.Time{} }
-func (fi mapFI) Mode() os.FileMode {
-	if fi.IsDir() {
-		return 0755 | os.ModeDir
-	}
-	return 0444
-}
-func (fi mapFI) Name() string     { return pathpkg.Base(fi.name) }
-func (fi mapFI) Size() int64      { return int64(fi.size) }
-func (fi mapFI) Sys() interface{} { return nil }

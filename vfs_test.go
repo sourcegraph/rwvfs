@@ -5,12 +5,16 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"net/http"
+	"net/http/httptest"
+	"net/url"
 	"os"
 	"path/filepath"
 	"reflect"
 	"sort"
 	"testing"
 
+	"github.com/kr/fs"
 	"golang.org/x/tools/godoc/vfs/mapfs"
 )
 
@@ -58,6 +62,14 @@ func TestRWVFS(t *testing.T) {
 	}
 	defer os.RemoveAll(tmpdir)
 
+	h := http.Handler(HTTPHandler(Map(map[string]string{}), nil))
+	httpServer := httptest.NewServer(h)
+	defer httpServer.Close()
+	httpURL, err := url.Parse(httpServer.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	tests := []struct {
 		fs   FileSystem
 		path string
@@ -65,6 +77,7 @@ func TestRWVFS(t *testing.T) {
 		{OS(tmpdir), "/foo"},
 		{Map(map[string]string{}), "/foo"},
 		{Sub(Map(map[string]string{}), "/x"), "/foo"},
+		{HTTP(httpURL, nil), "/foo"},
 	}
 	for _, test := range tests {
 		testWrite(t, test.fs, test.path)
@@ -189,7 +202,7 @@ func testMkdir(t *testing.T, fs FileSystem) {
 
 	err = fs.Mkdir("/dir1")
 	if !os.IsExist(err) {
-		t.Errorf("%s: Mkdir(/dir1) again: got no error, want os.IsExist-satisfying error", label)
+		t.Errorf("%s: Mkdir(/dir1) again: got err %v, want os.IsExist-satisfying error", label, err)
 	}
 
 	err = fs.Mkdir("/parent-doesnt-exist/dir2")
@@ -265,6 +278,80 @@ func TestMap_MkdirAllWithRootNotExists(t *testing.T) {
 		if err := MkdirAll(fs, path); err != nil {
 			t.Errorf("MkdirAll %q: %s", path, err)
 		}
+	}
+}
+
+func TestHTTP_BaseURL(t *testing.T) {
+	m := map[string]string{"b/c": "c"}
+	mapFS := Map(m)
+
+	prefix := "/foo/bar/baz"
+
+	h := http.Handler(http.StripPrefix(prefix, HTTPHandler(mapFS, nil)))
+	httpServer := httptest.NewServer(h)
+	defer httpServer.Close()
+	httpURL, err := url.Parse(httpServer.URL + prefix)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	fs := HTTP(httpURL, nil)
+
+	if err := MkdirAll(fs, "b"); err != nil {
+		t.Errorf("MkdirAll %q: %s", "b", err)
+	}
+
+	fis, err := fs.ReadDir("b")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(fis) != 1 {
+		t.Errorf("got len(fis) == %d, want 1", len(fis))
+	}
+	if wantName := "c"; fis[0].Name() != wantName {
+		t.Errorf("got name == %q, want %q", fis[0].Name(), wantName)
+	}
+}
+
+func TestMap_Walk(t *testing.T) {
+	m := map[string]string{"a": "a", "b/c": "c", "b/x/y/z": "z"}
+	mapFS := Map(m)
+
+	var names []string
+	w := fs.WalkFS(".", Walkable(mapFS))
+	for w.Step() {
+		if err := w.Err(); err != nil {
+			t.Fatalf("walk path %q: %s", w.Path(), err)
+		}
+		names = append(names, w.Path())
+	}
+
+	wantNames := []string{".", "a", "b", "b/c", "b/x", "b/x/y", "b/x/y/z"}
+	sort.Strings(names)
+	sort.Strings(wantNames)
+	if !reflect.DeepEqual(names, wantNames) {
+		t.Errorf("got entry names %v, want %v", names, wantNames)
+	}
+}
+
+func TestMap_Walk2(t *testing.T) {
+	m := map[string]string{"a/b/c/d": "a"}
+	mapFS := Map(m)
+
+	var names []string
+	w := fs.WalkFS(".", Walkable(Sub(mapFS, "a/b")))
+	for w.Step() {
+		if err := w.Err(); err != nil {
+			t.Fatalf("walk path %q: %s", w.Path(), err)
+		}
+		names = append(names, w.Path())
+	}
+
+	wantNames := []string{".", "c", "c/d"}
+	sort.Strings(names)
+	sort.Strings(wantNames)
+	if !reflect.DeepEqual(names, wantNames) {
+		t.Errorf("got entry names %v, want %v", names, wantNames)
 	}
 }
 
