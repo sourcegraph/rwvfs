@@ -162,9 +162,15 @@ type httpFilePost struct {
 	bytes.Buffer
 	c    *httpFS
 	path string
+
+	closed bool
 }
 
 func (f *httpFilePost) Close() error {
+	if f.closed {
+		return nil
+	}
+	f.closed = true
 	req, err := f.c.newRequest("PUT", f.path, ioutil.NopCloser(&f.Buffer))
 	if err != nil {
 		return err
@@ -230,7 +236,7 @@ func (c *httpFS) send(httpClient *http.Client, req *http.Request) (*http.Respons
 	if err != nil {
 		return resp, err
 	}
-	if !isHTTP20x {
+	if resp != nil && !isHTTP20x {
 		resp.Body.Close()
 		switch resp.StatusCode {
 		case http.StatusNotFound:
@@ -259,7 +265,7 @@ type httpFSHandler struct {
 	log *log.Logger
 }
 
-func (h *httpFSHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+func (h *httpFSHandler) ServeHTTPAndReturnError(w http.ResponseWriter, r *http.Request) error {
 	var err error
 	switch r.Method {
 	case "GET":
@@ -270,10 +276,12 @@ func (h *httpFSHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		err = h.put(w, r)
 	case "DELETE":
 		err = h.remove(w, r)
-	default:
-		http.Error(w, http.StatusText(http.StatusMethodNotAllowed), http.StatusMethodNotAllowed)
 	}
+	return err
+}
 
+func (h *httpFSHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	err := h.ServeHTTPAndReturnError(w, r)
 	var status int
 	if os.IsNotExist(err) {
 		status = http.StatusNotFound
