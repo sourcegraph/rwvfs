@@ -86,13 +86,13 @@ func Glob(wfs WalkableFileSystem, prefix, pattern string) (matches []string, err
 }
 
 type WalkableFileSystem interface {
-	vfs.FileSystem
+	FileSystem
 	Join(elem ...string) string
 }
 
 // Walkable creates a walkable VFS by wrapping fs.
-func Walkable(fs vfs.FileSystem) WalkableFileSystem { return walkableFileSystem{fs} }
+func Walkable(fs FileSystem) WalkableFileSystem { return walkableFileSystem{fs} }
 
-type walkableFileSystem struct{ vfs.FileSystem }
+type walkableFileSystem struct{ FileSystem }
 
 func (_ walkableFileSystem) Join(elem ...string) string { return filepath.Join(elem...) }
