@@ -13,11 +13,22 @@ import (
 // OS returns an implementation of FileSystem reading from the tree rooted at
 // root.
 func OS(root string) FileSystem {
-	return osFS{root, vfs.OS(root)}
+	return OSPerm(root, 0666, 0755)
+}
+
+func OSPerm(root string, filePerm, dirPerm os.FileMode) FileSystem {
+	return osFS{
+		root:       root,
+		filePerm:   filePerm,
+		dirPerm:    dirPerm,
+		FileSystem: vfs.OS(root),
+	}
 }
 
 type osFS struct {
-	root string
+	root     string
+	filePerm os.FileMode
+	dirPerm  os.FileMode
 	vfs.FileSystem
 }
 
@@ -35,7 +46,7 @@ func (fs osFS) resolve(path string) string {
 // Create opens the file at path for writing, creating the file if it doesn't
 // exist and truncating it otherwise.
 func (fs osFS) Create(path string) (io.WriteCloser, error) {
-	f, err := os.Create(fs.resolve(path))
+	f, err := os.OpenFile(fs.resolve(path), os.O_RDWR|os.O_CREATE|os.O_TRUNC, fs.filePerm)
 	if err != nil {
 		return nil, err
 	}
@@ -52,8 +63,7 @@ func (fs osFS) Create(path string) (io.WriteCloser, error) {
 }
 
 func (fs osFS) Mkdir(name string) error {
-	err := os.Mkdir(fs.resolve(name), 0700)
-	return err
+	return os.Mkdir(fs.resolve(name), fs.dirPerm)
 }
 
 func (fs osFS) Remove(name string) error {
