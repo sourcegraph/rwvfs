@@ -10,6 +10,8 @@ import (
 	"reflect"
 	"sort"
 	"testing"
+
+	"golang.org/x/tools/godoc/vfs/mapfs"
 )
 
 func TestSub(t *testing.T) {
@@ -264,4 +266,30 @@ func TestMap_MkdirAllWithRootNotExists(t *testing.T) {
 			t.Errorf("MkdirAll %q: %s", path, err)
 		}
 	}
+}
+
+func TestReadOnly(t *testing.T) {
+	m := map[string]string{"x": "y"}
+	rfs := mapfs.New(m)
+	wfs := ReadOnly(rfs)
+
+	if _, err := rfs.Stat("/x"); err != nil {
+		t.Error(err)
+	}
+
+	_, err := wfs.Create("/y")
+	if want := (&os.PathError{"create", "/y", ErrReadOnly}); !reflect.DeepEqual(err, want) {
+		t.Errorf("Create: got err %v, want %v", err, want)
+	}
+
+	err = wfs.Mkdir("/y")
+	if want := (&os.PathError{"mkdir", "/y", ErrReadOnly}); !reflect.DeepEqual(err, want) {
+		t.Errorf("Mkdir: got err %v, want %v", err, want)
+	}
+
+	err = wfs.Remove("/y")
+	if want := (&os.PathError{"remove", "/y", ErrReadOnly}); !reflect.DeepEqual(err, want) {
+		t.Errorf("Remove: got err %v, want %v", err, want)
+	}
+
 }
