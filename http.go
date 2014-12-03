@@ -54,7 +54,7 @@ func (c *httpFS) Stat(path string) (os.FileInfo, error) {
 }
 
 func (c *httpFS) stat(httpClient *http.Client, path string) (os.FileInfo, error) {
-	fi := &fileInfo{name: pathpkg.Base(path)}
+	fi := fileInfo{name: pathpkg.Base(path)}
 	req, err := c.newRequest("HEAD", path, nil)
 	if err != nil {
 		return nil, err
@@ -65,7 +65,7 @@ func (c *httpFS) stat(httpClient *http.Client, path string) (os.FileInfo, error)
 		// Don't check for errors, so that this VFS can be used
 		// against HTTP endpoints other than just those created by
 		// HTTPHandler.
-		setHTTPResponseFileInfo(resp, fi)
+		setHTTPResponseFileInfo(resp, &fi)
 	}
 	if err != nil && !isIgnoredRedirectErr(err) {
 		return nil, err
@@ -120,7 +120,7 @@ func (c *httpFS) ReadDir(path string) ([]os.FileInfo, error) {
 		return nil, &os.PathError{"readdir", path, syscall.ENOTDIR}
 	}
 
-	var fis []*fileInfo
+	var fis []*fileInfoJSON
 	if err := json.NewDecoder(resp.Body).Decode(&fis); err != nil {
 		return nil, err
 	}
@@ -355,7 +355,13 @@ func (h *httpFSHandler) readDir(w http.ResponseWriter, r *http.Request) error {
 	}
 	writeFileInfoHeaders(w, fi, false)
 	w.WriteHeader(http.StatusOK)
-	return json.NewEncoder(w).Encode(fis)
+
+	jsonFIs := make([]*fileInfoJSON, len(fis))
+	for i, fi := range fis {
+		jsonFIs[i] = &fileInfoJSON{fi}
+	}
+
+	return json.NewEncoder(w).Encode(jsonFIs)
 }
 
 func (h *httpFSHandler) stat(w http.ResponseWriter, r *http.Request) error {
