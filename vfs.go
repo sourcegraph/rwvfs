@@ -90,6 +90,9 @@ type WalkableFileSystem interface {
 	Join(elem ...string) string
 }
 
+// Walkable creates a walkable VFS by wrapping fs.
+func Walkable(fs FileSystem) WalkableFileSystem { return walkableFileSystem{fs} }
+
 type walkableFileSystem struct{ FileSystem }
 
 func (_ walkableFileSystem) Join(elem ...string) string { return filepath.Join(elem...) }
