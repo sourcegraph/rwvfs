@@ -114,7 +114,7 @@ func testGlob(t *testing.T, fs FileSystem) {
 		{"", "x/*", []string{"x/y", "x/2.txt"}},
 	}
 	for _, test := range globTests {
-		matches, err := Glob(walkableFileSystem{fs}, test.prefix, test.pattern)
+		matches, err := Glob(Walkable(fs), test.prefix, test.pattern)
 		if err != nil {
 			t.Errorf("%s: Glob(prefix=%q, pattern=%q): %s", label, test.prefix, test.pattern, err)
 			continue
@@ -379,4 +379,111 @@ func TestReadOnly(t *testing.T) {
 		t.Errorf("Remove: got err %v, want %v", err, want)
 	}
 
+}
+
+func TestOS_ReadLink(t *testing.T) {
+	tmpdir, err := ioutil.TempDir("", "rwvfs-test-")
+	if err != nil {
+		t.Fatal("TempDir", err)
+	}
+	defer os.RemoveAll(tmpdir)
+
+	if err := ioutil.WriteFile(filepath.Join(tmpdir, "myfile"), []byte("hello"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(filepath.Join(tmpdir, "myfile"), filepath.Join(tmpdir, "mylink")); err != nil {
+		t.Fatal(err)
+	}
+
+	osfs := OS(tmpdir)
+	dst, err := osfs.(LinkReader).ReadLink("mylink")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := "myfile"; dst != want {
+		t.Errorf("%s: ReadLink: got %q, want %q", osfs, dst, want)
+	}
+}
+
+func TestOS_ReadLink_walkable(t *testing.T) {
+	tmpdir, err := ioutil.TempDir("", "rwvfs-test-")
+	if err != nil {
+		t.Fatal("TempDir", err)
+	}
+	defer os.RemoveAll(tmpdir)
+
+	if err := ioutil.WriteFile(filepath.Join(tmpdir, "myfile"), []byte("hello"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(filepath.Join(tmpdir, "myfile"), filepath.Join(tmpdir, "mylink")); err != nil {
+		t.Fatal(err)
+	}
+
+	osfs := OS(tmpdir)
+	dst, err := Walkable(osfs).(LinkReader).ReadLink("mylink")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := "myfile"; dst != want {
+		t.Errorf("%s: ReadLink: got %q, want %q", osfs, dst, want)
+	}
+}
+
+func TestSub_ReadLink(t *testing.T) {
+	tmpdir, err := ioutil.TempDir("", "rwvfs-test-")
+	if err != nil {
+		t.Fatal("TempDir", err)
+	}
+	defer os.RemoveAll(tmpdir)
+
+	if err := os.Mkdir(filepath.Join(tmpdir, "mydir"), 0700); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := ioutil.WriteFile(filepath.Join(tmpdir, "mydir", "myfile"), []byte("hello"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(filepath.Join(tmpdir, "mydir", "myfile"), filepath.Join(tmpdir, "mydir", "mylink")); err != nil {
+		t.Fatal(err)
+	}
+
+	osfs := OS(tmpdir)
+	sub := Sub(osfs, "mydir")
+	dst, err := sub.(LinkReader).ReadLink("mylink")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := "myfile"; dst != want {
+		t.Errorf("%s: ReadLink: got %q, want %q", osfs, dst, want)
+	}
+}
+
+func TestOS_ReadLink_ErrOutsideRoot(t *testing.T) {
+	tmpdir1, err := ioutil.TempDir("", "rwvfs-test-")
+	if err != nil {
+		t.Fatal("TempDir", err)
+	}
+	defer os.RemoveAll(tmpdir1)
+
+	tmpdir2, err := ioutil.TempDir("", "rwvfs-test-")
+	if err != nil {
+		t.Fatal("TempDir", err)
+	}
+	defer os.RemoveAll(tmpdir2)
+
+	if err := ioutil.WriteFile(filepath.Join(tmpdir1, "myfile"), []byte("hello"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(filepath.Join(tmpdir1, "myfile"), filepath.Join(tmpdir2, "mylink")); err != nil {
+		t.Fatal(err)
+	}
+
+	osfs := OS(tmpdir2)
+	dst, err := osfs.(LinkReader).ReadLink("mylink")
+	if want := ErrOutsideRoot; err != want {
+		t.Fatalf("%s: ReadLink: got err %v, want %v", osfs, err, want)
+	}
+	if want := filepath.Join(tmpdir1, "myfile"); dst != want {
+		t.Errorf("%s: ReadLink: got %q, want %q", osfs, dst, want)
+	}
 }

@@ -1,11 +1,13 @@
 package rwvfs
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"os"
 	pathpkg "path"
 	"path/filepath"
+	"strings"
 
 	"golang.org/x/tools/godoc/vfs"
 )
@@ -42,6 +44,23 @@ func (fs osFS) resolve(path string) string {
 
 	return filepath.Join(string(fs.root), path)
 }
+
+func (fs osFS) ReadLink(name string) (string, error) {
+	dst, err := os.Readlink(fs.resolve(name))
+	if err != nil {
+		return "", err
+	}
+	if !filepath.IsAbs(dst) {
+		dst = filepath.Join(fs.resolve(name), dst)
+	}
+	if !strings.HasPrefix(dst, fs.root+string(os.PathSeparator)) && dst != fs.root {
+		return dst, ErrOutsideRoot
+	}
+	return filepath.Rel(fs.root, dst)
+}
+
+// ErrOutsideRoot occurs when a symlink refers to a path that is not in the current VFS.
+var ErrOutsideRoot = errors.New("link destination is outside of filesystem")
 
 // Create opens the file at path for writing, creating the file if it doesn't
 // exist and truncating it otherwise.
