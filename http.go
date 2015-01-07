@@ -416,6 +416,9 @@ func (h *httpFSHandler) create(w http.ResponseWriter, r *http.Request) error {
 	if _, err := io.Copy(f, r.Body); err != nil {
 		return err
 	}
+	if err := f.Close(); err != nil {
+		return err
+	}
 	w.WriteHeader(http.StatusCreated)
 	return nil
 }
