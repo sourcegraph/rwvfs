@@ -1,6 +1,7 @@
 package rwvfs
 
 import (
+	"bytes"
 	"io"
 	"os"
 	pathpkg "path"
@@ -41,7 +42,7 @@ func (mfs mapFS) Create(path string) (io.WriteCloser, error) {
 	// immediately update string values with writes.
 	path = filename(path)
 	mfs.m[path] = ""
-	return &mapFile{mfs.m, path}, nil
+	return &mapFile{m: mfs.m, path: path}, nil
 }
 
 func filename(p string) string {
@@ -72,16 +73,25 @@ func slash(p string) string {
 }
 
 type mapFile struct {
+	buf  bytes.Buffer
 	m    map[string]string
 	path string
 }
 
 func (f *mapFile) Write(p []byte) (int, error) {
-	f.m[f.path] = f.m[f.path] + string(p)
-	return len(p), nil
+	return f.buf.Write(p)
 }
 
-func (f mapFile) Close() error { return nil }
+func (f *mapFile) Close() error {
+	if f.m == nil {
+		// duplicate closes are noop
+		return nil
+	}
+	f.m[f.path] = f.buf.String()
+	f.buf.Reset()
+	f.m = nil
+	return nil
+}
 
 func (mfs mapFS) lstat(p string) (os.FileInfo, error) {
 	// proxy mapfs.mapFS.Lstat to not return errors for empty directories
