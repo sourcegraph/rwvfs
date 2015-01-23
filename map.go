@@ -169,11 +169,15 @@ func fileInfoNames(fis []os.FileInfo) []string {
 func (mfs mapFS) Mkdir(name string) error {
 	name = filename(name)
 	if _, err := mfs.Stat(slashdir(name)); err != nil {
+		if osErr, ok := err.(*os.PathError); ok && osErr != nil {
+			osErr.Op = "mkdir"
+			osErr.Path = name
+		}
 		return err
 	}
 	fi, _ := mfs.Stat(name)
 	if fi != nil {
-		return os.ErrExist
+		return &os.PathError{Op: "mkdir", Path: name, Err: os.ErrExist}
 	}
 	mfs.dirs[name] = struct{}{}
 	return nil

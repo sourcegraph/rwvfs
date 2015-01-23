@@ -65,7 +65,7 @@ func (s subFS) Mkdir(name string) error {
 	err := s.mkdir(name)
 	if os.IsNotExist(err) {
 		// Automatically create subFS's prefix dirs they don't exist.
-		if osErr, ok := err.(*os.PathError); ok && slash(osErr.Path) == slash(s.prefix) {
+		if osErr, ok := err.(*os.PathError); ok && slashdir(osErr.Path) == slash(s.prefix) {
 
 			if err := MkdirAll(s.fs, s.prefix); err != nil {
 				return err
