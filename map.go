@@ -37,6 +37,14 @@ type mapFS struct {
 	vfs.FileSystem
 }
 
+func (mfs mapFS) Open(path string) (vfs.ReadSeekCloser, error) {
+	f, err := mfs.FileSystem.Open(path)
+	if err != nil {
+		return nil, &os.PathError{Op: "open", Path: path, Err: err}
+	}
+	return f, nil
+}
+
 func (mfs mapFS) Create(path string) (io.WriteCloser, error) {
 	// Mimic behavior of OS filesystem: truncate to empty string upon creation;
 	// immediately update string values with writes.
