@@ -3,6 +3,7 @@ package rwvfs
 import (
 	"io"
 	"os"
+	"path"
 	"path/filepath"
 	"strings"
 
@@ -37,38 +38,74 @@ func (s subFS) resolve(path string) string {
 	return filepath.Join(s.prefix, strings.TrimPrefix(path, "/"))
 }
 
-func (s subFS) Lstat(path string) (os.FileInfo, error) { return s.fs.Lstat(s.resolve(path)) }
+func (s subFS) stripPrefix(path string) string {
+	return "/" + strings.TrimPrefix(strings.TrimPrefix(strings.TrimPrefix(path, "/"), strings.TrimPrefix(s.prefix, "/")), "/")
+}
 
-func (s subFS) Stat(path string) (os.FileInfo, error) { return s.fs.Stat(s.resolve(path)) }
+func (s subFS) Lstat(path string) (os.FileInfo, error) {
+	fi, err := s.fs.Lstat(s.resolve(path))
+	if err != nil {
+		return nil, s.resolvePathError(err)
+	}
+	return fi, nil
+}
+
+func (s subFS) Stat(path string) (os.FileInfo, error) {
+	fi, err := s.fs.Stat(s.resolve(path))
+	if err != nil {
+		return nil, s.resolvePathError(err)
+	}
+	return fi, nil
+}
 
 func (s subLinkFS) ReadLink(name string) (string, error) {
 	dst, err := s.fs.(LinkFS).ReadLink(s.resolve(name))
 	if err != nil {
-		return dst, err
+		return dst, s.resolvePathError(err)
 	}
 	return filepath.Rel(s.prefix, dst)
 }
 
 func (s subLinkFS) Symlink(oldname, newname string) error {
-	return s.fs.(LinkFS).Symlink(s.resolve(oldname), s.resolve(newname))
+	if err := s.fs.(LinkFS).Symlink(s.resolve(oldname), s.resolve(newname)); err != nil {
+		return s.resolvePathError(err)
+	}
+	return nil
 }
 
-func (s subFS) ReadDir(path string) ([]os.FileInfo, error) { return s.fs.ReadDir(s.resolve(path)) }
+func (s subFS) ReadDir(path string) ([]os.FileInfo, error) {
+	entries, err := s.fs.ReadDir(s.resolve(path))
+	if err != nil {
+		return nil, s.resolvePathError(err)
+	}
+	return entries, nil
+}
 
 func (s subFS) String() string { return "sub(" + s.fs.String() + ", " + s.prefix + ")" }
 
-func (s subFS) Open(name string) (vfs.ReadSeekCloser, error) { return s.fs.Open(s.resolve(name)) }
+func (s subFS) Open(name string) (vfs.ReadSeekCloser, error) {
+	f, err := s.fs.Open(s.resolve(name))
+	if err != nil {
+		return nil, s.resolvePathError(err)
+	}
+	return f, nil
+}
 
-func (s subFS) Create(path string) (io.WriteCloser, error) { return s.fs.Create(s.resolve(path)) }
+func (s subFS) Create(path string) (io.WriteCloser, error) {
+	f, err := s.fs.Create(s.resolve(path))
+	if err != nil {
+		return nil, s.resolvePathError(err)
+	}
+	return f, nil
+}
 
 func (s subFS) Mkdir(name string) error {
 	err := s.mkdir(name)
 	if os.IsNotExist(err) {
 		// Automatically create subFS's prefix dirs they don't exist.
-		if osErr, ok := err.(*os.PathError); ok && slashdir(osErr.Path) == slash(s.prefix) {
-
+		if osErr, ok := err.(*os.PathError); ok && path.Dir(osErr.Path) == "/" {
 			if err := MkdirAll(s.fs, s.prefix); err != nil {
-				return err
+				return s.resolvePathError(err)
 			}
 			return s.mkdir(name)
 		}
@@ -76,6 +113,26 @@ func (s subFS) Mkdir(name string) error {
 	return err
 }
 
-func (s subFS) mkdir(name string) error { return s.fs.Mkdir(s.resolve(name)) }
+func (s subFS) mkdir(name string) error {
+	if err := s.fs.Mkdir(s.resolve(name)); err != nil {
+		return s.resolvePathError(err)
+	}
+	return nil
+}
 
-func (s subFS) Remove(name string) error { return s.fs.Remove(s.resolve(name)) }
+func (s subFS) Remove(name string) error {
+	if err := s.fs.Remove(s.resolve(name)); err != nil {
+		return s.resolvePathError(err)
+	}
+	return nil
+}
+
+func (s subFS) resolvePathError(err error) error {
+	if err == nil {
+		return nil
+	}
+	if perr, ok := err.(*os.PathError); ok && perr != nil {
+		perr.Path = s.stripPrefix(perr.Path)
+	}
+	return err
+}

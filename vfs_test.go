@@ -183,10 +183,14 @@ func testMkdir(t *testing.T, fs FileSystem) {
 	label := fmt.Sprintf("%T", fs)
 
 	if _, ok := fs.(subFS); ok {
-		fs.Mkdir("/")
+		if err := fs.Mkdir("/"); err != nil && !os.IsExist(err) {
+			t.Fatalf("%s: subFS Mkdir(/): %s", label, err)
+		}
 	}
 	if _, ok := fs.(mapFS); ok {
-		fs.Mkdir("/")
+		if err := fs.Mkdir("/"); err != nil && !os.IsExist(err) {
+			t.Fatalf("%s: mapFS Mkdir(/): %s", label, err)
+		}
 	}
 
 	fi, err := fs.Stat(".")
@@ -203,6 +207,13 @@ func testMkdir(t *testing.T, fs FileSystem) {
 	}
 	if !fi.Mode().IsDir() {
 		t.Fatalf("%s: got Stat(/) FileMode %o, want IsDir", label, fi.Mode())
+	}
+
+	if _, err := fs.ReadDir("."); err != nil {
+		t.Fatalf("%s: ReadDir(.): %s", label, err)
+	}
+	if _, err := fs.ReadDir("/"); err != nil {
+		t.Fatalf("%s: ReadDir(/): %s", label, err)
 	}
 
 	err = fs.Mkdir("dir0")

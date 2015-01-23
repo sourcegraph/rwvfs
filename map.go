@@ -17,7 +17,7 @@ import (
 func Map(m map[string]string) FileSystem {
 	fs := mapFS{
 		m:          m,
-		dirs:       map[string]struct{}{"": struct{}{}},
+		dirs:       map[string]struct{}{"/": struct{}{}},
 		FileSystem: mapfs.New(m),
 	}
 
@@ -38,6 +38,7 @@ type mapFS struct {
 }
 
 func (mfs mapFS) Open(path string) (vfs.ReadSeekCloser, error) {
+	path = slash(path)
 	f, err := mfs.FileSystem.Open(path)
 	if err != nil {
 		return nil, &os.PathError{Op: "open", Path: path, Err: err}
@@ -48,14 +49,15 @@ func (mfs mapFS) Open(path string) (vfs.ReadSeekCloser, error) {
 func (mfs mapFS) Create(path string) (io.WriteCloser, error) {
 	// Mimic behavior of OS filesystem: truncate to empty string upon creation;
 	// immediately update string values with writes.
-	path = filename(path)
-	mfs.m[path] = ""
-	return &mapFile{m: mfs.m, path: path}, nil
+	path = slash(path)
+	mfs.m[noslash(path)] = ""
+	return &mapFile{m: mfs.m, path: noslash(path)}, nil
 }
 
-func filename(p string) string {
-	if p == "." {
-		return "/"
+func noslash(p string) string {
+	p = slash(p)
+	if p == "/" {
+		return "."
 	}
 	return strings.TrimPrefix(p, "/")
 }
@@ -104,11 +106,11 @@ func (f *mapFile) Close() error {
 func (mfs mapFS) lstat(p string) (os.FileInfo, error) {
 	// proxy mapfs.mapFS.Lstat to not return errors for empty directories
 	// created with Mkdir
-	p = filename(p)
+	p = slash(p)
 	fi, err := mfs.FileSystem.Lstat(p)
 	if os.IsNotExist(err) {
 		_, ok := mfs.dirs[p]
-		if ok || slash(p) == "/" {
+		if ok {
 			return fileInfo{name: pathpkg.Base(p), dir: true}, nil
 		}
 	}
@@ -134,7 +136,7 @@ func (mfs mapFS) Stat(p string) (os.FileInfo, error) {
 func (mfs mapFS) ReadDir(p string) ([]os.FileInfo, error) {
 	// proxy mapfs.mapFS.ReadDir to not return errors for empty directories
 	// created with Mkdir
-	p = filename(p)
+	p = slash(p)
 	fis, err := mfs.FileSystem.ReadDir(p)
 	if os.IsNotExist(err) {
 		_, ok := mfs.dirs[p]
@@ -167,25 +169,27 @@ func fileInfoNames(fis []os.FileInfo) []string {
 }
 
 func (mfs mapFS) Mkdir(name string) error {
-	name = filename(name)
-	if _, err := mfs.Stat(slashdir(name)); err != nil {
-		if osErr, ok := err.(*os.PathError); ok && osErr != nil {
-			osErr.Op = "mkdir"
-			osErr.Path = name
+	name = slash(name)
+	if slashdir(name) != slash(name) { // don't check for root dir's parent
+		if _, err := mfs.Stat(slashdir(name)); err != nil {
+			if osErr, ok := err.(*os.PathError); ok && osErr != nil {
+				osErr.Op = "mkdir"
+				osErr.Path = name
+			}
+			return err
 		}
-		return err
 	}
 	fi, _ := mfs.Stat(name)
 	if fi != nil {
 		return &os.PathError{Op: "mkdir", Path: name, Err: os.ErrExist}
 	}
-	mfs.dirs[name] = struct{}{}
+	mfs.dirs[slash(name)] = struct{}{}
 	return nil
 }
 
 func (mfs mapFS) Remove(name string) error {
-	name = filename(name)
+	name = slash(name)
 	delete(mfs.dirs, name)
-	delete(mfs.m, name)
+	delete(mfs.m, noslash(name))
 	return nil
 }
