@@ -216,6 +216,14 @@ func testMkdir(t *testing.T, fs FileSystem) {
 		t.Fatalf("%s: ReadDir(/): %s", label, err)
 	}
 
+	fis, err := fs.ReadDir("/")
+	if err != nil {
+		t.Fatalf("%s: ReadDir(/): %s", label, err)
+	}
+	if len(fis) != 0 {
+		t.Fatalf("%s: ReadDir(/): got %d file infos (%v), want none (is it including .?)", label, len(fis), fis)
+	}
+
 	err = fs.Mkdir("dir0")
 	if err != nil {
 		t.Fatalf("%s: Mkdir(dir0): %s", label, err)

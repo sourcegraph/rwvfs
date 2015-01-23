@@ -145,7 +145,7 @@ func (mfs mapFS) ReadDir(p string) ([]os.FileInfo, error) {
 			// fails here because it thinks the directories don't exist).
 			fis = nil
 			for dir, _ := range mfs.dirs {
-				if filepath.Dir(dir) == p || (p == "" && filepath.Dir(dir) == "." && dir != "." && dir != "") {
+				if (p != "/" && filepath.Dir(dir) == p) || (p == "/" && filepath.Dir(dir) == "." && dir != "." && dir != "") {
 					fis = append(fis, newDirInfo(dir))
 				}
 			}
