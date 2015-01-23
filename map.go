@@ -108,7 +108,7 @@ func (mfs mapFS) lstat(p string) (os.FileInfo, error) {
 	fi, err := mfs.FileSystem.Lstat(p)
 	if os.IsNotExist(err) {
 		_, ok := mfs.dirs[p]
-		if ok {
+		if ok || slash(p) == "/" {
 			return fileInfo{name: pathpkg.Base(p), dir: true}, nil
 		}
 	}

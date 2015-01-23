@@ -182,11 +182,30 @@ func testWrite(t *testing.T, fs FileSystem, path string) {
 func testMkdir(t *testing.T, fs FileSystem) {
 	label := fmt.Sprintf("%T", fs)
 
-	if _, ok := fs.(*subFS); ok {
+	if _, ok := fs.(subFS); ok {
+		fs.Mkdir("/")
+	}
+	if _, ok := fs.(mapFS); ok {
 		fs.Mkdir("/")
 	}
 
-	err := fs.Mkdir("dir0")
+	fi, err := fs.Stat(".")
+	if err != nil {
+		t.Fatalf("%s: Stat(.): %s", label, err)
+	}
+	if !fi.Mode().IsDir() {
+		t.Fatalf("%s: got Stat(.) FileMode %o, want IsDir", label, fi.Mode())
+	}
+
+	fi, err = fs.Stat("/")
+	if err != nil {
+		t.Fatalf("%s: Stat(/): %s", label, err)
+	}
+	if !fi.Mode().IsDir() {
+		t.Fatalf("%s: got Stat(/) FileMode %o, want IsDir", label, fi.Mode())
+	}
+
+	err = fs.Mkdir("dir0")
 	if err != nil {
 		t.Fatalf("%s: Mkdir(dir0): %s", label, err)
 	}
