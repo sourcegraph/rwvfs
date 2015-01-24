@@ -7,6 +7,7 @@ import (
 	pathpkg "path"
 	"path/filepath"
 	"strings"
+	"sync"
 
 	"golang.org/x/tools/godoc/vfs"
 	"golang.org/x/tools/godoc/vfs/mapfs"
@@ -18,6 +19,7 @@ func Map(m map[string]string) FileSystem {
 	fs := mapFS{
 		m:          m,
 		dirs:       map[string]struct{}{"/": struct{}{}},
+		mu:         new(sync.RWMutex),
 		FileSystem: mapfs.New(m),
 	}
 
@@ -34,10 +36,14 @@ func Map(m map[string]string) FileSystem {
 type mapFS struct {
 	m    map[string]string
 	dirs map[string]struct{}
+	mu   *sync.RWMutex
 	vfs.FileSystem
 }
 
 func (mfs mapFS) Open(path string) (vfs.ReadSeekCloser, error) {
+	mfs.mu.RLock()
+	defer mfs.mu.RUnlock()
+
 	path = slash(path)
 	f, err := mfs.FileSystem.Open(path)
 	if err != nil {
@@ -47,11 +53,14 @@ func (mfs mapFS) Open(path string) (vfs.ReadSeekCloser, error) {
 }
 
 func (mfs mapFS) Create(path string) (io.WriteCloser, error) {
+	mfs.mu.Lock()
+	defer mfs.mu.Unlock()
+
 	// Mimic behavior of OS filesystem: truncate to empty string upon creation;
 	// immediately update string values with writes.
 	path = slash(path)
 	mfs.m[noslash(path)] = ""
-	return &mapFile{m: mfs.m, path: noslash(path)}, nil
+	return &mapFile{m: mfs.m, path: noslash(path), fsMu: mfs.mu}, nil
 }
 
 func noslash(p string) string {
@@ -86,6 +95,7 @@ type mapFile struct {
 	buf  bytes.Buffer
 	m    map[string]string
 	path string
+	fsMu *sync.RWMutex
 }
 
 func (f *mapFile) Write(p []byte) (int, error) {
@@ -97,6 +107,10 @@ func (f *mapFile) Close() error {
 		// duplicate closes are noop
 		return nil
 	}
+
+	f.fsMu.Lock()
+	defer f.fsMu.Unlock()
+
 	f.m[f.path] = f.buf.String()
 	f.buf.Reset()
 	f.m = nil
@@ -104,6 +118,9 @@ func (f *mapFile) Close() error {
 }
 
 func (mfs mapFS) lstat(p string) (os.FileInfo, error) {
+	mfs.mu.RLock()
+	defer mfs.mu.RUnlock()
+
 	// proxy mapfs.mapFS.Lstat to not return errors for empty directories
 	// created with Mkdir
 	p = slash(p)
@@ -134,6 +151,9 @@ func (mfs mapFS) Stat(p string) (os.FileInfo, error) {
 }
 
 func (mfs mapFS) ReadDir(p string) ([]os.FileInfo, error) {
+	mfs.mu.RLock()
+	defer mfs.mu.RUnlock()
+
 	// proxy mapfs.mapFS.ReadDir to not return errors for empty directories
 	// created with Mkdir
 	p = slash(p)
@@ -183,11 +203,18 @@ func (mfs mapFS) Mkdir(name string) error {
 	if fi != nil {
 		return &os.PathError{Op: "mkdir", Path: name, Err: os.ErrExist}
 	}
+
+	mfs.mu.Lock()
+	defer mfs.mu.Unlock()
+
 	mfs.dirs[slash(name)] = struct{}{}
 	return nil
 }
 
 func (mfs mapFS) Remove(name string) error {
+	mfs.mu.Lock()
+	defer mfs.mu.Unlock()
+
 	name = slash(name)
 	delete(mfs.dirs, name)
 	delete(mfs.m, noslash(name))
