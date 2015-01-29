@@ -35,12 +35,28 @@ type MkdirAllOverrider interface {
 	MkdirAll(path string) error
 }
 
+func isMkdirAllOverrider(fs FileSystem) (MkdirAllOverrider, bool) {
+	switch fs := fs.(type) {
+	case MkdirAllOverrider:
+		return fs, true
+	case subFS:
+		return isMkdirAllOverrider(fs.fs)
+	case subLinkFS:
+		return isMkdirAllOverrider(fs.fs)
+	case walkableFS:
+		return isMkdirAllOverrider(fs.FileSystem)
+	case walkableLinkFS:
+		return isMkdirAllOverrider(fs.FileSystem)
+	}
+	return nil, false
+}
+
 // MkdirAll creates a directory named path, along with any necessary parents. If
 // path is already a directory, MkdirAll does nothing and returns nil.
 func MkdirAll(fs FileSystem, path string) error {
 	// adapted from os/MkdirAll
 
-	if fs, ok := fs.(MkdirAllOverrider); ok {
+	if fs, ok := isMkdirAllOverrider(fs); ok {
 		return fs.MkdirAll(path)
 	}
 
