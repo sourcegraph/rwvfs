@@ -120,6 +120,13 @@ func (s subFS) mkdir(name string) error {
 	return nil
 }
 
+// MkdirAll implements rwvfs.MkdirAllOverrider. This makes it possible
+// to wrap MkdirAllOverriders in subFS and still invoke their
+// overrided method.
+func (s subFS) MkdirAll(name string) error {
+	return MkdirAll(s.fs, s.resolve(name))
+}
+
 func (s subFS) Remove(name string) error {
 	if err := s.fs.Remove(s.resolve(name)); err != nil {
 		return s.resolvePathError(err)
