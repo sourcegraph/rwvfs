@@ -26,10 +26,23 @@ type FileSystem interface {
 	Remove(name string) error
 }
 
+// MkdirAllOverrider can be implemented by VFSs for which MkdirAll
+// requires special behavior (e.g., VFSs without any discrete notion
+// of a directory, such as Amazon S3). When MkdirAll is called on
+// MkdirAllOverrider implementations, it calls the interface's method
+// and passes along the error (if any).
+type MkdirAllOverrider interface {
+	MkdirAll(path string) error
+}
+
 // MkdirAll creates a directory named path, along with any necessary parents. If
 // path is already a directory, MkdirAll does nothing and returns nil.
 func MkdirAll(fs FileSystem, path string) error {
 	// adapted from os/MkdirAll
+
+	if fs, ok := fs.(MkdirAllOverrider); ok {
+		return fs.MkdirAll(path)
+	}
 
 	dir, err := fs.Stat(path)
 	if err == nil {
