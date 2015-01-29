@@ -39,6 +39,8 @@ func isMkdirAllOverrider(fs FileSystem) (MkdirAllOverrider, bool) {
 	switch fs := fs.(type) {
 	case MkdirAllOverrider:
 		return fs, true
+	case loggedFS:
+		return isMkdirAllOverrider(fs.fs)
 	case subFS:
 		return isMkdirAllOverrider(fs.fs)
 	case subLinkFS:
