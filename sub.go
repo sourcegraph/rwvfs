@@ -15,9 +15,17 @@ import (
 // can call Mkdir("/") on the new filesystem to create it.
 func Sub(fs FileSystem, prefix string) FileSystem {
 	subfs := subFS{fs, prefix}
-	switch fs.(type) {
+	switch ufs := fs.(type) {
 	case LinkFS:
 		return subLinkFS{subfs}
+	case FetcherOpener:
+		return subFetcherOpenerFS{subfs}
+	case walkableFS:
+		return Sub(ufs.FileSystem, prefix)
+	case walkableFetcherOpenerFS:
+		return Sub(ufs.FileSystem, prefix)
+	case loggedFS:
+		return Sub(ufs.fs, prefix)
 	default:
 		return subfs
 	}
@@ -33,6 +41,10 @@ var _ FileSystem = subFS{}
 type subLinkFS struct{ subFS }
 
 var _ LinkFS = subLinkFS{}
+
+type subFetcherOpenerFS struct{ subFS }
+
+var _ FetcherOpener = subFetcherOpenerFS{}
 
 func (s subFS) resolve(path string) string {
 	return filepath.Join(s.prefix, strings.TrimPrefix(path, "/"))
@@ -85,6 +97,14 @@ func (s subFS) String() string { return "sub(" + s.fs.String() + ", " + s.prefix
 
 func (s subFS) Open(name string) (vfs.ReadSeekCloser, error) {
 	f, err := s.fs.Open(s.resolve(name))
+	if err != nil {
+		return nil, s.resolvePathError(err)
+	}
+	return f, nil
+}
+
+func (s subFetcherOpenerFS) OpenFetcher(name string) (vfs.ReadSeekCloser, error) {
+	f, err := s.fs.(FetcherOpener).OpenFetcher(s.resolve(name))
 	if err != nil {
 		return nil, s.resolvePathError(err)
 	}

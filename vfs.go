@@ -45,6 +45,8 @@ func isMkdirAllOverrider(fs FileSystem) (MkdirAllOverrider, bool) {
 		return isMkdirAllOverrider(fs.fs)
 	case subLinkFS:
 		return isMkdirAllOverrider(fs.fs)
+	case subFetcherOpenerFS:
+		return isMkdirAllOverrider(fs.fs)
 	case walkableFS:
 		return isMkdirAllOverrider(fs.FileSystem)
 	case walkableLinkFS:
@@ -127,6 +129,8 @@ func Walkable(fs FileSystem) WalkableFileSystem {
 	switch fs.(type) {
 	case LinkFS:
 		return walkableLinkFS{wfs}
+	case FetcherOpener:
+		return walkableFetcherOpenerFS{wfs}
 	default:
 		return wfs
 	}
@@ -147,6 +151,14 @@ func (f walkableLinkFS) Symlink(oldname, newname string) error {
 }
 
 var _ LinkFS = walkableLinkFS{}
+
+type walkableFetcherOpenerFS struct{ walkableFS }
+
+func (f walkableFetcherOpenerFS) OpenFetcher(name string) (vfs.ReadSeekCloser, error) {
+	return f.FileSystem.(FetcherOpener).OpenFetcher(name)
+}
+
+var _ FetcherOpener = walkableFetcherOpenerFS{}
 
 // A LinkFS is a filesystem that supports creating and dereferencing
 // symlinks.
