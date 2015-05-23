@@ -173,8 +173,11 @@ func (c *httpFS) OpenRange(name, rangeHeader string) (f vfs.ReadSeekCloser, err 
 			err = err2
 		}
 	}()
+	// TODO(sqs): why is the content length not getting set?
 	b, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
+		log.Printf("len(body)=%d content-length=%q %d", len(b), resp.Header.Get("content-length"), resp.ContentLength)
+		log.Println("<<" + string(b) + ">>")
 		return nil, err
 	}
 	return nopCloser{bytes.NewReader(b)}, nil
