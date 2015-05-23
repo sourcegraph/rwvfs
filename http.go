@@ -307,6 +307,7 @@ func (h *httpFSHandler) ServeHTTPAndReturnError(w http.ResponseWriter, r *http.R
 }
 
 func (h *httpFSHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	h.log.Printf("%s %s", r.Method, r.URL)
 	err := h.ServeHTTPAndReturnError(w, r)
 	var status int
 	if os.IsNotExist(err) {
