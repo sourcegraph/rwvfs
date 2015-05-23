@@ -132,26 +132,39 @@ func (c *httpFS) ReadDir(path string) ([]os.FileInfo, error) {
 }
 
 func (c *httpFS) Open(name string) (vfs.ReadSeekCloser, error) {
+	return c.OpenRange(name, "")
+}
+
+func (c *httpFS) OpenFetcher(name string) (vfs.ReadSeekCloser, error) {
+	return OpenFetcher(c, name)
+}
+
+func (c *httpFS) OpenRange(name, rangeHeader string) (f vfs.ReadSeekCloser, err error) {
 	req, err := c.newRequest("GET", name, nil)
 	if err != nil {
 		return nil, err
 	}
 	req.Header.Set("accept", httpFileContentType)
+	if rangeHeader != "" {
+		req.Header.Set("range", rangeHeader)
+	}
 
 	resp, err := c.send(nil, req)
 	if err != nil {
 		return nil, &os.PathError{"open", name, err}
 	}
-	return failSeeker{resp.Body}, nil
-}
 
-type failSeeker struct{ io.ReadCloser }
-
-func (failSeeker) Seek(offset int64, whence int) (int64, error) {
-	// TODO(sqs): is Seek used by any clients of rwvfs? if so,
-	// consider buffering the HTTP response so it can actually
-	// implement Seek.
-	return 0, errors.New("rwvfs.HTTP VFS does not support seeking")
+	defer func() {
+		err2 := resp.Body.Close()
+		if err == nil {
+			err = err2
+		}
+	}()
+	b, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+	return nopCloser{bytes.NewReader(b)}, nil
 }
 
 func (c *httpFS) Create(path string) (io.WriteCloser, error) {
@@ -328,7 +341,12 @@ func (h *httpFSHandler) open(w http.ResponseWriter, r *http.Request) error {
 		}
 	}
 
-	writeFileInfoHeaders(w, fi, true)
+	// Only write Content-Length if we're getting the whole
+	// file. TODO(sqs): we can compute the content-length fairly
+	// easily; we should.
+	writeContentLength := r.Header.Get("range") == ""
+
+	writeFileInfoHeaders(w, fi, writeContentLength)
 
 	if notMod {
 		return nil
@@ -339,8 +357,43 @@ func (h *httpFSHandler) open(w http.ResponseWriter, r *http.Request) error {
 		return err
 	}
 	defer f.Close()
-	_, err = io.Copy(w, f)
+	rdr := io.Reader(f)
+
+	// Support Range header.
+	if rangeHeader := r.Header.Get("range"); rangeHeader != "" {
+		bstart, bend, err := parseHTTPRange(rangeHeader)
+		if err != nil {
+			return err
+		}
+		if _, err := f.Seek(bstart, 0); err != nil {
+			return err
+		}
+		rdr = io.LimitReader(f, bend-bstart)
+	}
+
+	_, err = io.Copy(w, rdr)
 	return err
+}
+
+func parseHTTPRange(rangeHeader string) (byteStart, byteEnd int64, err error) {
+	if !strings.HasPrefix(rangeHeader, "bytes=") {
+		return 0, 0, fmt.Errorf("rwvfs: invalid HTTP Range header: %q", rangeHeader)
+	}
+	rangeHeader = strings.TrimPrefix(rangeHeader, "bytes=")
+	parts := strings.Split(rangeHeader, "-")
+	if len(parts) != 2 {
+		return 0, 0, fmt.Errorf("rwvfs: invalid HTTP Range header byte range: %s", rangeHeader)
+	}
+	bstart, err := strconv.Atoi(parts[0])
+	if err != nil {
+		return 0, 0, fmt.Errorf("rwvfs: invalid HTTP Range header byte start: %s", err)
+	}
+	bend, err := strconv.Atoi(parts[1])
+	if err != nil {
+		return 0, 0, fmt.Errorf("rwvfs: invalid HTTP Range header byte end: %s", err)
+	}
+	return int64(bstart), int64(bend), nil
+
 }
 
 func (h *httpFSHandler) readDir(w http.ResponseWriter, r *http.Request) error {
@@ -453,3 +506,9 @@ func asJSON(v interface{}) string {
 	b, _ := json.Marshal(v)
 	return string(b)
 }
+
+type nopCloser struct {
+	io.ReadSeeker
+}
+
+func (nc nopCloser) Close() error { return nil }

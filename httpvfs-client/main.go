@@ -10,13 +10,17 @@ import (
 	"path"
 	"time"
 
+	"golang.org/x/tools/godoc/vfs"
+
 	"strings"
 
 	"sourcegraph.com/sourcegraph/rwvfs"
 )
 
 var (
-	urlStr = flag.String("url", "http://localhost:7070/", "URL to HTTP VFS (typically served by the `httpvfs` program)")
+	urlStr    = flag.String("url", "http://localhost:7070/", "URL to HTTP VFS (typically served by the `httpvfs` program)")
+	startByte = flag.Int("start-byte", 0, "('cat' only) byte range start")
+	endByte   = flag.Int("end-byte", -1, "('cat' only) byte range end")
 )
 
 func main() {
@@ -38,7 +42,18 @@ func main() {
 
 	switch strings.ToLower(op) {
 	case "cat":
-		f, err := fs.Open(path)
+		if *startByte != 0 && *endByte < *startByte {
+			log.Fatal("error: -end-byte must be greater than -start-byte")
+		}
+
+		var f vfs.ReadSeekCloser
+		var err error
+
+		if *startByte != 0 {
+			f, err = fs.(rwvfs.FetcherOpener).OpenFetcher(path)
+		} else {
+			f, err = fs.Open(path)
+		}
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -47,8 +62,27 @@ func main() {
 				log.Fatal(err)
 			}
 		}()
-		if _, err := io.Copy(os.Stdout, f); err != nil {
-			log.Fatal(err)
+
+		rdr := io.Reader(f)
+
+		if *startByte != 0 {
+			if err := f.(rwvfs.Fetcher).Fetch(int64(*startByte), int64(*endByte)); err != nil {
+				log.Fatalf("Fetch bytes=%d-%d: %s", *startByte, *endByte, err)
+			}
+		}
+
+		if *startByte != 0 {
+			if _, err := f.Seek(int64(*startByte), 0); err != nil {
+				log.Fatalln("Seek:", err)
+			}
+		}
+		if *endByte != -1 {
+			byteLen := *endByte - *startByte
+			rdr = io.LimitReader(f, int64(byteLen))
+		}
+
+		if _, err := io.Copy(os.Stdout, rdr); err != nil {
+			log.Fatalln("Copy:", err)
 		}
 
 	case "ls":

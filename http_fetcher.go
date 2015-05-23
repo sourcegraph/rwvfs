@@ -3,8 +3,8 @@ package rwvfs
 import (
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"log"
+	"os"
 
 	"golang.org/x/tools/godoc/vfs"
 )
@@ -35,7 +35,7 @@ type explicitFetchFile struct {
 	autofetch          bool
 }
 
-var vlog = log.New(ioutil.Discard, "rwvfs: ", 0)
+var vlog = log.New(os.Stderr, "rwvfs: ", 0)
 
 func (f *explicitFetchFile) Read(p []byte) (n int, err error) {
 	ofs, err := f.Seek(0, 1) // get current offset
