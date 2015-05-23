@@ -4,7 +4,6 @@ import (
 	"flag"
 	"log"
 	"net/http"
-	"os"
 	"path/filepath"
 
 	"sourcegraph.com/sourcegraph/rwvfs"
@@ -26,6 +25,6 @@ func main() {
 
 	log.Printf("Serving %s on %s", dir, *httpAddr)
 
-	http.Handle("/", rwvfs.HTTPHandler(rwvfs.OS(dir), os.Stderr))
+	http.Handle("/", rwvfs.HTTPHandler(rwvfs.OS(dir), nil))
 	log.Fatal(http.ListenAndServe(*httpAddr, nil))
 }
