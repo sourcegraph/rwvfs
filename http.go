@@ -132,7 +132,20 @@ func (c *httpFS) ReadDir(path string) ([]os.FileInfo, error) {
 }
 
 func (c *httpFS) Open(name string) (vfs.ReadSeekCloser, error) {
-	return c.OpenRange(name, "")
+	f, err := c.OpenRange(name, "")
+	if err != nil {
+		return nil, err
+	}
+	return failSeeker{f}, nil
+}
+
+type failSeeker struct{ io.ReadCloser }
+
+func (failSeeker) Seek(offset int64, whence int) (int64, error) {
+	// TODO(sqs): is Seek used by any clients of rwvfs? if so,
+	// consider buffering the HTTP response so it can actually
+	// implement Seek.
+	return 0, errors.New("rwvfs.HTTP VFS does not support seeking")
 }
 
 func (c *httpFS) OpenFetcher(name string) (vfs.ReadSeekCloser, error) {
