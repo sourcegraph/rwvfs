@@ -355,12 +355,7 @@ func (h *httpFSHandler) open(w http.ResponseWriter, r *http.Request) error {
 		}
 	}
 
-	// Only write Content-Length if we're getting the whole
-	// file. TODO(sqs): we can compute the content-length fairly
-	// easily; we should.
-	writeContentLength := r.Header.Get("range") == ""
-
-	writeFileInfoHeaders(w, fi, writeContentLength)
+	writeFileInfoHeaders(w, fi)
 
 	if notMod {
 		return nil
@@ -420,7 +415,7 @@ func (h *httpFSHandler) readDir(w http.ResponseWriter, r *http.Request) error {
 	if err != nil {
 		return err
 	}
-	writeFileInfoHeaders(w, fi, false)
+	writeFileInfoHeaders(w, fi)
 	w.WriteHeader(http.StatusOK)
 
 	jsonFIs := make([]*fileInfoJSON, len(fis))
@@ -436,15 +431,17 @@ func (h *httpFSHandler) stat(w http.ResponseWriter, r *http.Request) error {
 	if err != nil {
 		return err
 	}
-	writeFileInfoHeaders(w, fi, true)
+	writeFileInfoHeaders(w, fi)
 	w.WriteHeader(http.StatusOK)
 	return nil
 }
 
-func writeFileInfoHeaders(w http.ResponseWriter, fi os.FileInfo, writeContentLength bool) {
-	if writeContentLength {
-		w.Header().Set("content-length", strconv.FormatInt(fi.Size(), 10))
-	}
+func writeFileInfoHeaders(w http.ResponseWriter, fi os.FileInfo) {
+	// Note: We avoid writing Content-Length because our
+	// http.ResponseWriter might be wrapped in something like a gzip
+	// middleware, in which case the Content-Length must be that of
+	// the compressed data (which we can't compute here).
+
 	if !fi.ModTime().IsZero() {
 		w.Header().Set("last-modified", fi.ModTime().Format(http.TimeFormat))
 	}
