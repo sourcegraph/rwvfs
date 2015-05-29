@@ -34,7 +34,7 @@ httpvfs-client rm foo
 ```
 
 
-TODO
+Future roadmap
 ----
 
 * Add corresponding implementations of `rwvfs.FileSystem` for mapfs and zipfs
