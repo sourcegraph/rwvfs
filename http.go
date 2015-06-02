@@ -61,7 +61,7 @@ func (c *httpFS) stat(httpClient *http.Client, path string) (os.FileInfo, error)
 	}
 	resp, err := c.send(httpClient, req)
 	if resp != nil {
-		defer resp.Body.Close()
+		defer closeCompletely(resp)
 		// Don't check for errors, so that this VFS can be used
 		// against HTTP endpoints other than just those created by
 		// HTTPHandler.
@@ -114,7 +114,7 @@ func (c *httpFS) ReadDir(path string) ([]os.FileInfo, error) {
 	if err != nil {
 		return nil, &os.PathError{"readdir", path, err}
 	}
-	defer resp.Body.Close()
+	defer closeCompletely(resp)
 
 	if contentType := resp.Header.Get("content-type"); contentType != httpDirContentType {
 		return nil, &os.PathError{"readdir", path, syscall.ENOTDIR}
@@ -207,7 +207,7 @@ func (f *httpFilePost) Close() error {
 	if err != nil {
 		return &os.PathError{"create", f.path, err}
 	}
-	return resp.Body.Close()
+	return closeCompletely(resp)
 }
 
 func (c *httpFS) Mkdir(name string) error {
@@ -221,7 +221,7 @@ func (c *httpFS) Mkdir(name string) error {
 	if err != nil {
 		return &os.PathError{"mkdir", name, err}
 	}
-	return resp.Body.Close()
+	return closeCompletely(resp)
 }
 
 func (c *httpFS) Remove(name string) error {
@@ -233,7 +233,7 @@ func (c *httpFS) Remove(name string) error {
 	if err != nil {
 		return &os.PathError{"remove", name, err}
 	}
-	return resp.Body.Close()
+	return closeCompletely(resp)
 }
 
 // newRequest creates a new (unsent) HTTP request.
@@ -263,7 +263,7 @@ func (c *httpFS) send(httpClient *http.Client, req *http.Request) (*http.Respons
 		return resp, err
 	}
 	if resp != nil && !isHTTP20x {
-		resp.Body.Close()
+		closeCompletely(resp)
 		switch resp.StatusCode {
 		case http.StatusNotFound:
 			err = os.ErrNotExist
@@ -523,3 +523,17 @@ type nopCloser struct {
 }
 
 func (nc nopCloser) Close() error { return nil }
+
+// closeCompletely reads the remainder of the HTTP response body and
+// then closes the response. These two actions are necessary to allow
+// the http.Client to reclaim the underlying TCP connection for
+// subsequent "keep-alive" requests.
+func closeCompletely(resp *http.Response) error {
+	if _, err := io.Copy(ioutil.Discard, resp.Body); err != nil {
+		return err
+	}
+	if err := resp.Body.Close(); err != nil {
+		return err
+	}
+	return nil
+}
