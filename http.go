@@ -529,11 +529,11 @@ func (nc nopCloser) Close() error { return nil }
 // the http.Client to reclaim the underlying TCP connection for
 // subsequent "keep-alive" requests.
 func closeCompletely(resp *http.Response) error {
-	if _, err := io.Copy(ioutil.Discard, resp.Body); err != nil {
-		return err
+	_, err1 := io.Copy(ioutil.Discard, resp.Body)
+	err2 := resp.Body.Close()
+
+	if err1 != nil {
+		return err1
 	}
-	if err := resp.Body.Close(); err != nil {
-		return err
-	}
-	return nil
+	return err2
 }
