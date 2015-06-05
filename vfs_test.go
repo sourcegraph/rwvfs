@@ -81,6 +81,7 @@ func TestRWVFS(t *testing.T) {
 		{rwvfs.Map(map[string]string{}), "/foo"},
 		{rwvfs.Sub(rwvfs.Map(map[string]string{}), "/x"), "/foo"},
 		{rwvfs.HTTP(httpURL, nil), "/foo"},
+		{rwvfs.Union(rwvfs.Map(map[string]string{}), rwvfs.Map(map[string]string{})), "/foo"},
 	}
 	for _, test := range tests {
 		testWrite(t, test.fs, test.path)
@@ -606,5 +607,52 @@ func TestOS_ReadLink_ErrOutsideRoot(t *testing.T) {
 	}
 	if want := filepath.Join(tmpdir1, "myfile"); dst != want {
 		t.Errorf("%s: ReadLink: got %q, want %q", osfs, dst, want)
+	}
+}
+
+func TestUnion(t *testing.T) {
+	m1 := map[string]string{"foo/file": ""}
+	m2 := map[string]string{"bar/file": ""}
+	u := rwvfs.Union(rwvfs.Map(m1), rwvfs.Map(m2))
+
+	infos, err := u.ReadDir("/")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, want := len(infos), 2; got != want {
+		t.Errorf(`ReadDir: got %d, want %d`, got, want)
+	}
+
+	testCreate(t, u, "test", m1)
+	testCreate(t, u, "foo/test", m1)
+	testCreate(t, u, "bar/test", m2)
+}
+
+func TestEmptyUnion(t *testing.T) {
+	u := rwvfs.Union()
+	infos, err := u.ReadDir("/")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, want := len(infos), 0; got != want {
+		t.Errorf(`ReadDir: got %d, want %d`, got, want)
+	}
+
+	_, err = u.Create("/foo")
+	if err == nil {
+		t.Error("Create: read-only error expected")
+	}
+}
+
+func testCreate(t *testing.T, u rwvfs.FileSystem, path string, m map[string]string) {
+	w, err := u.Create(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	w.Write([]byte("test"))
+	w.Close()
+
+	if got, want := m[path], "test"; got != want {
+		t.Errorf(`Create: got %v, want %v`, got, want)
 	}
 }
