@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"time"
 
 	"sourcegraph.com/sourcegraph/rwvfs"
 )
@@ -16,6 +17,7 @@ var (
 	httpAddr   = flag.String("http", ":7070", "HTTP listen address")
 	storageDir = flag.String("dir", ".", "directory to serve via HTTP (caution: HTTP clients can create/edit/delete/view any files in this dir)")
 	verbose    = flag.Bool("v", false, "verbose output")
+	delay      = flag.Int("delay", 0, "artificial handler response latency, in milliseconds, for simulating slowness")
 )
 
 func main() {
@@ -36,6 +38,6 @@ func main() {
 		logTo = ioutil.Discard
 	}
 
-	http.Handle("/", rwvfs.HTTPHandler(rwvfs.OS(dir), logTo))
+	http.Handle("/", rwvfs.HTTPHandlerWithDelay(rwvfs.OS(dir), logTo, time.Duration(*delay)*time.Millisecond))
 	log.Fatal(http.ListenAndServe(*httpAddr, nil))
 }

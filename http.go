@@ -15,6 +15,7 @@ import (
 	"strconv"
 	"strings"
 	"syscall"
+	"time"
 
 	"golang.org/x/tools/godoc/vfs"
 )
@@ -280,18 +281,25 @@ func (c *httpFS) send(httpClient *http.Client, req *http.Request) (*http.Respons
 // access fs. It should be accessed by clients created using this
 // package's HTTP func.
 func HTTPHandler(fs FileSystem, logTo io.Writer) http.Handler {
+	return HTTPHandlerWithDelay(fs, logTo, 0)
+}
+
+func HTTPHandlerWithDelay(fs FileSystem, logTo io.Writer, delay time.Duration) http.Handler {
 	if logTo == nil {
 		logTo = ioutil.Discard
 	}
-	return &httpFSHandler{fs, log.New(logTo, "rwvfs HTTP: ", log.Flags())}
+	return &httpFSHandler{fs, log.New(logTo, "rwvfs HTTP: ", log.Flags()), delay}
 }
 
 type httpFSHandler struct {
-	fs  FileSystem
-	log *log.Logger
+	fs    FileSystem
+	log   *log.Logger
+	delay time.Duration
 }
 
 func (h *httpFSHandler) ServeHTTPAndReturnError(w http.ResponseWriter, r *http.Request) error {
+	time.Sleep(h.delay)
+
 	var err error
 	switch r.Method {
 	case "GET":
