@@ -1,6 +1,7 @@
 package cloudstoragevfs_test
 
 import (
+	"os"
 	"testing"
 
 	"golang.org/x/net/context"
@@ -12,6 +13,10 @@ import (
 )
 
 func TestVFS(t *testing.T) {
+	if os.Getenv("TRAVIS") == "true" {
+		t.Skip("no credentials on Travis")
+	}
+
 	_, err := google.DefaultClient(context.Background(), storage.DevstorageFullControlScope)
 	if err != nil {
 		t.Skip(err)
